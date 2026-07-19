@@ -1,6 +1,4 @@
-pub mod transport;
+pub mod playback;
 pub mod tempo;
+pub mod transport;
 pub mod scheduler;
-pub mod scheduled_note;
-pub mod scheduled_event;
-pub mod enums;

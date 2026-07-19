@@ -14,8 +14,8 @@
 //! Does Not Own:
 //! - ScheduledNote instances (which are borrowed by ScheduledEvent instances) 
 
-use crate::scheduled_note::ScheduledNote;
-use crate::enums::{NoteState};
+use crate::scheduler::enums::NoteState;
+use crate::scheduler::scheduled_note::ScheduledNote;
 
 /// Represents a scheduled event for a note, either turning it on or off at a specific beat position, 
 /// note consists of a reference to a `ScheduledNote` which contains the note's properties.
@@ -56,8 +56,8 @@ impl<'a> ScheduledEvent<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scheduled_note::ScheduledNote;
-    use crate::enums::NoteState;
+    use crate::scheduler::enums::NoteState;
+    use crate::scheduler::scheduled_note::ScheduledNote;
 
     #[test]
     fn test_scheduled_event_creation() {

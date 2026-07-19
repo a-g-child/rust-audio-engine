@@ -25,18 +25,6 @@ pub enum ScheduledNoteError {
 }
 
 #[derive(Debug, PartialEq, Eq, Ord, PartialOrd, Clone, Copy)]
-pub enum TransportState {
-    Playing,
-    Paused,
-    Stopped,
-    Rewinding,
-    Seeking,
-    SeekingBackward,
-    FastForwarding,
-    FastForwardingBackward,
-}
-
-#[derive(Debug, PartialEq, Eq, Ord, PartialOrd, Clone, Copy)]
 pub enum PlaybackEventType {
     NoteOff,
     NoteOn,

@@ -19,7 +19,7 @@
 //! - Midi
 
 use crate::tempo::Tempo;
-use crate::enums::TransportState;
+use crate::transport::enums::TransportState;
 /// Transport struct manages playback state and sample position.
 pub struct Transport {
     state: TransportState,

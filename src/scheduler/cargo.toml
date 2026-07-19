@@ -1,0 +1,7 @@
+[package]
+name = "scheduler"
+description = "A scheduler for the audio engine."
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]

@@ -27,11 +27,12 @@
 //! - Audio
 //! - Midi
 
-use crate::scheduled_event::ScheduledEvent;
-use crate::scheduled_note::ScheduledNote;
+use crate::scheduler::scheduled_event::ScheduledEvent;
+use crate::scheduler::scheduled_note::ScheduledNote;
 use crate::tempo::Tempo;
 use crate::transport::Transport;
-use crate::enums::{SchedulerError, NoteState, TransportState};
+use crate::scheduler::enums::{NoteState, SchedulerError};
+use crate::transport::TransportState;
 
 /// Stores notes in scheduling order and emits note-edge events
 /// for a configurable lookahead window.  

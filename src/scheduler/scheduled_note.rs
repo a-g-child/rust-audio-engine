@@ -20,7 +20,7 @@
 //! - ScheduledEvent instances (which borrow ScheduledNote instances)
 
 use uuid::Uuid;
-use crate::enums::ScheduledNoteError;
+use crate::scheduler::enums::ScheduledNoteError;
 
 const MAX_BEAT: f64 = 1.0e12; // Arbitrary large value to prevent overflow in calculations
 
