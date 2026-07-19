@@ -1,0 +1,13 @@
+[package]
+name = "engine-lab"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[dependencies.uuid]
+version = "1.23.5"
+# Lets you generate random UUIDs
+features = [
+    "v4",
+]
