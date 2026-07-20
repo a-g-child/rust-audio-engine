@@ -16,6 +16,7 @@
 
 use crate::scheduler::enums::NoteState;
 use crate::scheduler::scheduled_note::ScheduledNote;
+// use crate::playback::logic_gate::Probability;
 
 /// Represents a scheduled event for a note, either turning it on or off at a specific beat position, 
 /// note consists of a reference to a `ScheduledNote` which contains the note's properties.
@@ -52,6 +53,8 @@ impl<'a> ScheduledEvent<'a> {
         println!("ScheduledEvent: \n\tbeat: {}\n\tstate: {:?}\n\tnote: {:?}", self.beat(), self.state(), self.note());
     }
 }
+
+// impl Probability for ScheduledEvent<'_> {}
 
 #[cfg(test)]
 mod tests {
