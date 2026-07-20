@@ -24,14 +24,3 @@ pub enum ScheduledNoteError {
     InvalidProbability,
 }
 
-#[derive(Debug, PartialEq, Eq, Ord, PartialOrd, Clone, Copy)]
-pub enum PlaybackEventType {
-    NoteOff,
-    NoteOn,
-    ControlChange,
-    ProgramChange,
-    ParameterChange,
-    PitchWheelChange,
-    Aftertouch,
-    ChannelPressure,
-}

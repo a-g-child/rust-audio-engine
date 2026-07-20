@@ -32,7 +32,6 @@ pub struct ScheduledNote {
     end_beat: f64,
     note: u8,
     velocity: u8,
-    probability: u8,
 }
 
 impl ScheduledNote {
@@ -64,7 +63,6 @@ impl ScheduledNote {
             note,
             end_beat,
             velocity: 127,
-            probability: 127,
         })
     }
     /// Gets the unique identifier of the scheduled note.
@@ -116,18 +114,6 @@ impl ScheduledNote {
         self.velocity = velocity;
         Ok(())
     }
-    /// Gets the probability of the scheduled note.
-    pub fn probability(&self) -> u8 {
-        self.probability
-    }
-    /// Sets the probability of the scheduled note. The probability must not exceed 127.
-    pub fn set_probability(&mut self, probability: u8) -> Result<(), ScheduledNoteError> {
-        if probability > 127 {
-            return Err(ScheduledNoteError::InvalidProbability);
-        }
-        self.probability = probability;
-        Ok(())
-    }
 }
 
 
@@ -144,11 +130,9 @@ mod tests {
         assert_eq!(note.length(), 2.0);
         assert_eq!(note.note(), 60);
         assert_eq!(note.velocity(), 127);
-        assert_eq!(note.probability(), 127);
 
         assert!(note.set_length(f64::NAN).is_err());
         assert!(note.set_velocity(128).is_err());
-        assert!(note.set_probability(128).is_err());
     }
     
     #[test]
