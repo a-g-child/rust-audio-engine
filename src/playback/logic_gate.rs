@@ -1,15 +1,13 @@
 //! Logic gate between probabilities and playback events
 use crate::{playback::{PlaybackEvent,Probabilities}, scheduler::ScheduledEvent, scheduler::NoteState};
-use rand::{Rng, RngExt};
+use rand::RngExt;
 
 /// Filters a `PlaybackEvent` based on the provided `Probabilities`.
 /// If the event is a `NoteOn` event, it checks the probability associated with the note's UUID. 
 /// If the random chance is less than the probability, the event is returned; otherwise, `None` is returned.
 /// if 100% chance or 0% chance, it will always return the event or None respectively.
 pub fn filter_event(event: &ScheduledEvent, probabilities: &Probabilities) -> Option<PlaybackEvent> {
-    println!("starting Filter");
     if event.state() == NoteState::On {
-        println!("Filtering event for note ID: {:?}\n", event.note().id());
         let note_id = event.note().id();
         if let Some(probability) = probabilities.get(note_id) {
             let chance = probability.chance();
@@ -20,8 +18,6 @@ pub fn filter_event(event: &ScheduledEvent, probabilities: &Probabilities) -> Op
             } else {
                 let mut rng = rand::rng();
                 let roll: u8 = rng.random_range(0..=100);
-                println!("Roll: {}", roll);
-                println!("Chance: {}", chance);
                 if roll < chance {
                     return Some(PlaybackEvent::from(event));
                 } else {
