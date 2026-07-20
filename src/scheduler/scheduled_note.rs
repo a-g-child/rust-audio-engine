@@ -123,7 +123,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_scheduled_note_creation() {
+    fn create() {
         let mut note = ScheduledNote::new(0.0, 60, 2.0).unwrap();
         assert_eq!(note.start_beat(), 0.0);
         assert_eq!(note.end_beat(), 2.0);
@@ -136,7 +136,7 @@ mod tests {
     }
     
     #[test]
-    fn test_setter_errors() {
+    fn errors() {
         let mut note = ScheduledNote::new(0.0, 60, 2.0).unwrap();
 
         assert!(note.set_length(-1.0).is_err());

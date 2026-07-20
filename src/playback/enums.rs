@@ -1,5 +1,5 @@
 #[derive(Debug, PartialEq, Eq, Ord, PartialOrd, Clone, Copy)]
-pub enum PlaybackEventType {
+pub enum PlaybackEventKind {
     NoteOff{
         note: u8,
     },
@@ -13,4 +13,11 @@ pub enum PlaybackEventType {
     PitchWheelChange,
     Aftertouch,
     ChannelPressure,
+}
+
+#[derive(Debug, PartialEq, Eq, Ord, PartialOrd, Clone, Copy)]
+pub enum ProbabilityTarget {
+    Note,
+    Parameter,
+    Clip,    
 }

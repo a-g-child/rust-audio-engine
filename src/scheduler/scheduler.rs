@@ -225,7 +225,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_scheduler_creation_and_setters() {
+    fn creation_and_setters() {
         let mut scheduler = Scheduler::new();
         assert_eq!(scheduler.notes_count(), 0);
         assert_eq!(scheduler.lookahead, 4.0);
@@ -243,7 +243,7 @@ mod tests {
     }
 
     #[test]
-    fn test_schedule_event_adds_event() {
+    fn adds_event() {
         let mut scheduler = Scheduler::new();
 
         let event = ScheduledNote::new(0.0, 60, 2.0).unwrap();
@@ -254,7 +254,7 @@ mod tests {
     }
 
     #[test]
-    fn test_schedule_event_count() {
+    fn count() {
         let mut scheduler = Scheduler::new();
         scheduler.schedule_note(ScheduledNote::new(0.0, 60, 2.0).unwrap());
         scheduler.schedule_note(ScheduledNote::new(1.0, 62, 2.0).unwrap());
@@ -262,7 +262,7 @@ mod tests {
     }
 
     #[test]
-    fn test_advance_window() {
+    fn advance_window() {
         let mut scheduler = Scheduler::new();
         scheduler.schedule_note(ScheduledNote::new(0.0, 60, 1.0).unwrap());
         scheduler.schedule_note(ScheduledNote::new(1.0, 62, 1.0).unwrap());

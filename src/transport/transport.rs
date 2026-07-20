@@ -100,19 +100,19 @@ mod tests {
     use crate::transport::Transport;
 
     #[test]
-    fn test_transport_create() {
+    fn create() {
         let transport = Transport::new();
         assert_eq!(transport.is_playing(), false);
         assert_eq!(transport.sample_position(), 0);
     }
     #[test]
-    fn test_transport_play() {
+    fn play() {
         let mut transport = Transport::new();
         transport.play();
         assert_eq!(transport.is_playing(), true);
     }
     #[test]
-    fn test_transport_play_pause() {
+    fn play_pause() {
         let mut transport = Transport::new();
         transport.play();
         assert_eq!(transport.is_playing(), true);
@@ -120,7 +120,7 @@ mod tests {
         assert_eq!(transport.is_playing(), false);
     }
     #[test]
-    fn test_transport_play_stop() {
+    fn play_stop() {
         let mut transport = Transport::new();
         transport.play();
         assert_eq!(transport.is_playing(), true);
@@ -129,21 +129,21 @@ mod tests {
         assert_eq!(transport.sample_position(), 0);
     }
     #[test]
-    fn test_transport_play_already_playing() {
+    fn play_already_playing() {
         let mut transport = Transport::new();
         transport.play();
         transport.play(); // Should print a message but not change state
         assert_eq!(transport.is_playing(), true);
     }
     #[test]
-    fn test_transport_pause() {
+    fn pause() {
         let mut transport = Transport::new();
         transport.play();
         transport.pause();
         assert_eq!(transport.is_playing(), false);
     }
     #[test]
-    fn test_transport_stop() {
+    fn stop() {
         let mut transport = Transport::new();
         transport.play();
         transport.advance_s(44100);
@@ -153,20 +153,20 @@ mod tests {
         // assert_eq!(transport.beat_position, 0.00);
     }
     #[test]
-    fn test_transport_advance() {
+    fn advance() {
         let mut transport = Transport::new();
         transport.play();
         transport.advance_s(512);
         assert_eq!(transport.sample_position(), 512);
     }   
     #[test]
-    fn test_transport_advance_not_playing() {
+    fn advance_not_playing() {
         let mut transport = Transport::new();
         transport.advance_s(512);
         assert_eq!(transport.sample_position(), 0);
     }
     #[test]
-    fn test_transport_advance_play_pause() {
+    fn advance_play_pause() {
         let mut transport = Transport::new();
         transport.play();
         transport.advance_s(512);
@@ -176,20 +176,20 @@ mod tests {
         assert_eq!(transport.sample_position(), 512);
     }
     #[test]
-    fn test_transport_set_sample_position() {
+    fn set_sample_position() {
         let mut transport = Transport::new();
         transport.set_sample_position(44100);
         assert_eq!(transport.sample_position(), 44100);
     }
       #[test]
-    fn test_transport_set_sample_position_zero() {
+    fn set_sample_position_zero() {
         let mut transport = Transport::new();
         transport.set_sample_position(0);
         assert_eq!(transport.sample_position()  , 0);
     }
     // unable to add sample position negative test as u64 cannot be negative  
     #[test]
-    fn test_transport_get_beat_position() {
+    fn get_beat_position() {
         let mut transport = Transport::new();
         let tempo = Tempo::new(120.0, 44100, (4, 4));
         transport.set_sample_position(44100); // 1 second at 44100 Hz
@@ -198,7 +198,7 @@ mod tests {
     }
  
     #[test]
-    fn test_transport_get_time_now_ms() {
+    fn get_time_now_ms() {
         let mut transport = Transport::new();
         transport.set_sample_position(44100);
         let sample_rate = 44100;

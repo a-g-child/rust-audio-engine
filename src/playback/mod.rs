@@ -1,7 +1,10 @@
 pub mod playback_event;
-pub mod playback_event_model;
+pub mod mapper;
 pub mod enums;
+pub mod probability;
+pub mod logic_gate;
 
 pub use playback_event::PlaybackEvent;
-pub use playback_event_model::PlaybackEventModel;
-pub use enums::PlaybackEventType;
+pub use enums::{PlaybackEventKind, ProbabilityTarget};
+pub use probability::Probabilities;
+pub use logic_gate::filter_event;

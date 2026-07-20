@@ -60,7 +60,7 @@ mod tests {
     use crate::scheduler::scheduled_note::ScheduledNote;
 
     #[test]
-    fn test_scheduled_event_creation() {
+    fn create() {
         let note = ScheduledNote::new(0.0, 60, 2.0).unwrap();
         let event = ScheduledEvent::new(&note, NoteState::On);
         assert_eq!(event.beat(), 0.0);

@@ -108,46 +108,46 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_tempo_creation() {
+    fn create() {
         let tempo = Tempo::new(120.0, 44_100, (4, 4));
         assert_eq!(tempo.bpm(), 120.0);
         assert_eq!(tempo.sample_rate(), 44_100);
         assert_eq!(tempo.time_signature(), (4, 4));
     }
     #[test]
-    fn get_and_set_bpm() {
+    fn set_bpm() {
         let mut tempo = Tempo::new(120.0, 44_100, (4, 4));
         tempo.set_bpm(90.0);
         assert_eq!(tempo.bpm(), 90.0);
     }
     #[test]
-    fn get_and_set_sample_rate() {
+    fn set_sample_rate() {
         let mut tempo = Tempo::new(120.0, 44_100, (4, 4));
         tempo.set_sample_rate(48_000);
         assert_eq!(tempo.sample_rate(), 48_000);
     }
     #[test]
-    fn test_seconds_per_beat() {
+    fn seconds_per_beat() {
         let tempo = Tempo::new(120.0, 44_100, (4, 4));
         assert_eq!(tempo.seconds_per_beat(), 0.5);  
     }
     #[test]
-    fn test_samples_per_beat() {
+    fn samples_per_beat() {
         let tempo = Tempo::new(120.0, 44_100, (4, 4));
         assert_eq!(tempo.samples_per_beat(), 22_050);
     }
     #[test]
-    fn test_beats_from_seconds() {
+    fn beats_from_seconds() {
         let tempo = Tempo::new(120.0, 44_100, (4, 4));
         assert_eq!(tempo.beats_from_seconds(1.0), 2.0);  
     }
     #[test]
-    fn test_seconds_to_samples() {
+    fn seconds_to_samples() {
         let tempo = Tempo::new(120.0, 44_100, (4, 4));
         assert_eq!(tempo.seconds_to_samples(1.0), 44_100);
     }
     #[test]
-    fn test_samples_to_seconds() {
+    fn samples_to_seconds() {
         let tempo = Tempo::new(120.0, 44_100, (4    , 4));
         assert_eq!(tempo.samples_to_seconds(44_100), 1.0);  
     }
