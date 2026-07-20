@@ -78,7 +78,6 @@ mod tests {
     }
     #[test]
     fn map_note_on_event() {
-    fn map_note_on_event() {
         let note = ScheduledNote::new(0.0, 100, 1.0).unwrap();
         let scheduled_event = ScheduledEvent::new(&note, NoteState::On);    
         let playback_event = PlaybackEvent::from(&scheduled_event);
@@ -90,4 +89,3 @@ mod tests {
     }
 }
 
-}
