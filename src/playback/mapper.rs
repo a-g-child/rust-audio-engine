@@ -45,7 +45,7 @@ mod tests {
 	fn test_mapper() {
 
 		let note = crate::scheduler::ScheduledNote::new(0.0, 100, 1.0).unwrap();
-		let scheduled_event = crate::scheduler::ScheduledEvent::new(&note, crate::scheduler::NoteState::On); // Create a mock ScheduledEvent
+        let scheduled_event = crate::scheduler::ScheduledEvent::new(&note, crate::scheduler::NoteState::On, 0); // Create a mock ScheduledEvent
 		let playback_event: PlaybackEvent = (&scheduled_event).into();
 
 		assert_eq!(playback_event.beat, scheduled_event.beat());

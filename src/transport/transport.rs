@@ -24,6 +24,7 @@ use crate::transport::enums::TransportState;
 pub struct Transport {
     state: TransportState,
     sample_position: u64,
+    loop_iteration: u64,
 }
 /// Implementation of the Transport struct
 impl Transport {
@@ -31,6 +32,7 @@ impl Transport {
         Transport {
             state: TransportState::Stopped,
             sample_position: 0,
+            loop_iteration: 0,
         }
     }
     pub fn state(&self) -> TransportState {
@@ -52,6 +54,7 @@ impl Transport {
     pub fn stop(&mut self) {
         self.state = TransportState::Stopped;
         self.sample_position = 0;
+        self.loop_iteration = 0;
     }
     /// Advances the transport by a given number of samples
     pub fn advance_s(&mut self, samples: u64) {
@@ -68,6 +71,9 @@ impl Transport {
     /// Gets the current playback state
     pub fn is_playing(&self) -> bool {
         self.state == TransportState::Playing
+    }
+    pub fn loop_iteration(&self) -> u64 {
+        self.loop_iteration
     }
     /// Gets the current sample position
     pub fn sample_position(&self) -> u64 {

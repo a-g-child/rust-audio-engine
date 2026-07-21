@@ -93,10 +93,11 @@ impl Scheduler {
     pub fn advance_window(&mut self, transport: &Transport, tempo: &Tempo,) -> Result<Vec<ScheduledEvent<'_>>, SchedulerError> {
 
         let (window_start, window_end) = self.compute_window(transport, tempo);
+        let loop_iteration = transport.loop_iteration();
         if window_end == window_start { return Ok(Vec::new()); } // If the window is zero width, return an empty vector
         self.validate_window(window_start, window_end)?;
         self.commit_window_progress(window_end, transport, tempo)?;
-        let events = Self::collect_events_in_window(&self.notes, window_start, window_end);
+        let events = Self::collect_events_in_window(&self.notes, window_start, window_end, loop_iteration);
        
         Ok(events)
     }
@@ -106,12 +107,12 @@ impl Scheduler {
 impl Scheduler{
 
     /// Collects all scheduled events that occur within the specified scheduling window.
-    fn collect_events_in_window<'a>( notes: &'a [ScheduledNote], window_start: f64, window_end: f64,) -> Vec<ScheduledEvent<'a>> {
+    fn collect_events_in_window<'a>( notes: &'a [ScheduledNote], window_start: f64, window_end: f64, loop_iteration: u64,) -> Vec<ScheduledEvent<'a>> {
         
         let mut events: Vec<ScheduledEvent<'_>> = Vec::new();
 
         for note in notes {
-            Self::collect_note_events(window_start, window_end, &mut events, note);
+            Self::collect_note_events(window_start, window_end, &mut events, note, loop_iteration);
         }
         // Additional sort by state then id in event of same beat position.
         Self::sort_events(&mut events);
@@ -124,6 +125,7 @@ impl Scheduler{
         window_end: f64,
         events: &mut Vec<ScheduledEvent<'a>>,
         note: &'a ScheduledNote,
+        loop_iteration: u64,
     ) {
         let s = note.start_beat();
         let e = note.end_beat();
@@ -132,14 +134,14 @@ impl Scheduler{
         if s >= window_start && s < window_end {
             // if the start beat of the note is within the scheduling window,
             // create a ScheduledEvent with NoteState::On and add it to the output vector
-            events.push(ScheduledEvent::new(note, NoteState::On));
+            events.push(ScheduledEvent::new(note, NoteState::On, loop_iteration));
         }
 
         // End occurrence in window => NoteState::Off
         if e >= window_start && e < window_end {
             // if the end beat of the note is within the scheduling window,
             // create a ScheduledEvent with NoteState::Off and add it to the output vector
-            events.push(ScheduledEvent::new(note, NoteState::Off));
+            events.push(ScheduledEvent::new(note, NoteState::Off, loop_iteration));
         }
     }
 

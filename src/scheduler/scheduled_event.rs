@@ -14,25 +14,32 @@
 //! Does Not Own:
 //! - ScheduledNote instances (which are borrowed by ScheduledEvent instances) 
 
+// use uuid::Uuid;
+
 use crate::scheduler::enums::NoteState;
 use crate::scheduler::scheduled_note::ScheduledNote;
-// use crate::playback::logic_gate::Probability;
+use crate::scheduler::occurrence::NoteOccurrenceKey;
 
 /// Represents a scheduled event for a note, either turning it on or off at a specific beat position, 
 /// note consists of a reference to a `ScheduledNote` which contains the note's properties.
 pub struct ScheduledEvent<'a> {
     note: &'a ScheduledNote,
     state: NoteState,
+    loop_iteration: u64,
 }
 
 impl<'a> ScheduledEvent<'a> {
     /// Creates a new instance of `ScheduledEvent` with the given note and state (On or Off). 
     /// The note is borrowed from the `ScheduledNote` to avoid ownership issues, and the state indicates whether the event is turning the note on or off.
-    pub fn new(note: &'a ScheduledNote, state: NoteState) -> Self {
+    pub fn new(note: &'a ScheduledNote, state: NoteState, loop_iteration: u64) -> Self {
         // invariant already checked in ScheduledNote creation, so no need to check here.
-        ScheduledEvent { note, state }
+        ScheduledEvent {
+            note,
+            state,
+            loop_iteration,
+        }
     }
-    /// Gets the reference to the associated `ScheduledNote`.
+    /// Gets the reference to   the associated `ScheduledNote`.
     pub fn note(&self) -> &ScheduledNote {
         self.note
     }
@@ -49,6 +56,15 @@ impl<'a> ScheduledEvent<'a> {
     pub fn state(&self) -> NoteState {
         self.state
     }
+
+    pub fn loop_iteration(&self) -> u64 {
+        self.loop_iteration
+    }
+
+    pub fn occurrence_key(&self) -> NoteOccurrenceKey {
+        NoteOccurrenceKey::new(*self.note.id(), self.loop_iteration)
+    }
+
     pub fn print(&self) {
         println!("ScheduledEvent: \n\tbeat: {}\n\tstate: {:?}\n\tnote: {:?}", self.beat(), self.state(), self.note());
     }
@@ -65,9 +81,12 @@ mod tests {
     #[test]
     fn create() {
         let note = ScheduledNote::new(0.0, 60, 2.0).unwrap();
-        let event = ScheduledEvent::new(&note, NoteState::On);
+        let event = ScheduledEvent::new(&note, NoteState::On, 0);
         assert_eq!(event.beat(), 0.0);
         assert_eq!(event.state(), NoteState::On);
         assert_eq!(event.note().start_beat(), 0.0);
+        assert_eq!(event.occurrence_key().note_id(), note.id());
+        assert_eq!(event.loop_iteration(), 0);
+        assert_eq!(event.occurrence_key().loop_iteration(), 0);
     }
 }
