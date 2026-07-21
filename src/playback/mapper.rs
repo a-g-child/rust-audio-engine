@@ -40,11 +40,13 @@ impl From<&ScheduledEvent<'_>> for PlaybackEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use uuid::Uuid;
+    use crate::clips::ClipRouter;
 
 	#[test]
 	fn test_mapper() {
-
-		let note = crate::scheduler::ScheduledNote::new(0.0, 100, 1.0).unwrap();
+        let clip_router = ClipRouter::new(Uuid::new_v4());
+		let note = crate::scheduler::ScheduledNote::new(0.0, 100, 1.0, clip_router).unwrap();
         let scheduled_event = crate::scheduler::ScheduledEvent::new(&note, crate::scheduler::NoteState::On, 0); // Create a mock ScheduledEvent
 		let playback_event: PlaybackEvent = (&scheduled_event).into();
 

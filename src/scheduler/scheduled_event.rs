@@ -77,10 +77,13 @@ mod tests {
     use super::*;
     use crate::scheduler::enums::NoteState;
     use crate::scheduler::scheduled_note::ScheduledNote;
+    use crate::clips::ClipRouter;
+    use uuid::Uuid;
 
     #[test]
     fn create() {
-        let note = ScheduledNote::new(0.0, 60, 2.0).unwrap();
+        let clip_router = ClipRouter::new(Uuid::new_v4());
+        let note = ScheduledNote::new(0.0, 60, 2.0, clip_router).unwrap();
         let event = ScheduledEvent::new(&note, NoteState::On, 0);
         assert_eq!(event.beat(), 0.0);
         assert_eq!(event.state(), NoteState::On);

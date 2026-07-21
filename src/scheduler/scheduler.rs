@@ -225,6 +225,10 @@ impl Scheduler{
 #[cfg(test)]
 mod tests {
     use super::*;
+    use uuid::Uuid;
+    use crate::clips::ClipRouter;
+
+    
 
     #[test]
     fn creation_and_setters() {
@@ -247,8 +251,8 @@ mod tests {
     #[test]
     fn adds_event() {
         let mut scheduler = Scheduler::new();
-
-        let event = ScheduledNote::new(0.0, 60, 2.0).unwrap();
+        let clip_router = ClipRouter::new(Uuid::new_v4());
+        let event = ScheduledNote::new(0.0, 60, 2.0, clip_router).unwrap();
         scheduler.schedule_note(event);
         assert_eq!(scheduler.notes.len(), 1);
         assert_eq!(scheduler.notes[0].start_beat(), 0.0);
@@ -257,20 +261,22 @@ mod tests {
 
     #[test]
     fn count() {
+        let clip_router = ClipRouter::new(Uuid::new_v4());
         let mut scheduler = Scheduler::new();
-        scheduler.schedule_note(ScheduledNote::new(0.0, 60, 2.0).unwrap());
-        scheduler.schedule_note(ScheduledNote::new(1.0, 62, 2.0).unwrap());
+        scheduler.schedule_note(ScheduledNote::new(0.0, 60, 2.0,clip_router).unwrap());
+        scheduler.schedule_note(ScheduledNote::new(1.0, 62, 2.0, clip_router).unwrap());
         assert_eq!(scheduler.notes_count(), 2);
     }
 
     #[test]
     fn advance_window() {
         let mut scheduler = Scheduler::new();
-        scheduler.schedule_note(ScheduledNote::new(0.0, 60, 1.0).unwrap());
-        scheduler.schedule_note(ScheduledNote::new(1.0, 62, 1.0).unwrap());
-        scheduler.schedule_note(ScheduledNote::new(4.1, 64, 0.9).unwrap());
-        scheduler.schedule_note(ScheduledNote::new(4.2, 64, 1.0).unwrap());
-        scheduler.schedule_note(ScheduledNote::new(4.2, 64, 2.0).unwrap());
+        let clip_router = ClipRouter::new(Uuid::new_v4());
+        scheduler.schedule_note(ScheduledNote::new(0.0, 60, 1.0, clip_router).unwrap());
+        scheduler.schedule_note(ScheduledNote::new(1.0, 62, 1.0, clip_router).unwrap());
+        scheduler.schedule_note(ScheduledNote::new(4.1, 64, 0.9, clip_router).unwrap());
+        scheduler.schedule_note(ScheduledNote::new(4.2, 64, 1.0, clip_router).unwrap());
+        scheduler.schedule_note(ScheduledNote::new(4.2, 64, 2.0, clip_router).unwrap());
 
         let mut transport = Transport::new();
         let tempo = Tempo::new(120.0, 44_100, (4, 4));

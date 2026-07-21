@@ -18,8 +18,8 @@ pub struct PlaybackEvent {
 mod tests {
     use super::*;
     use uuid::Uuid;
-    use crate::scheduler::{ScheduledEvent, NoteState, ScheduledNote};
-    
+    use crate::scheduler::{ScheduledNote, ScheduledEvent, NoteState};
+    use crate::clips::ClipRouter;
     #[test]
     fn test_playback_event_fields() {
         let note_id = Uuid::new_v4();
@@ -47,7 +47,9 @@ mod tests {
     #[test]
     fn test_mapper() {
 
-        let note = ScheduledNote::new(0.0, 100, 1.0).unwrap();
+
+        let clip_router = ClipRouter::new(Uuid::new_v4());
+        let note = ScheduledNote::new(0.0, 100, 1.0, clip_router).unwrap();
 
         let scheduled_event = ScheduledEvent::new(&note, NoteState::On, 0); // Create a mock ScheduledEvent
         let playback_event = PlaybackEvent::from(&scheduled_event);
@@ -66,7 +68,8 @@ mod tests {
 
     #[test]
     fn map_note_off_event() {
-        let note = ScheduledNote::new(0.0, 100, 1.0).unwrap();
+        let clip_router = ClipRouter::new(Uuid::new_v4());
+        let note = ScheduledNote::new(0.0, 100, 1.0, clip_router).unwrap();
         let scheduled_event = ScheduledEvent::new(&note, NoteState::Off, 0);
 
         let playback_event = PlaybackEvent::from(&scheduled_event);
@@ -78,7 +81,9 @@ mod tests {
     }
     #[test]
     fn map_note_on_event() {
-        let note = ScheduledNote::new(0.0, 100, 1.0).unwrap();
+        use crate::clips::ClipRouter;
+        let clip_router = ClipRouter::new(Uuid::new_v4());
+        let note = ScheduledNote::new(0.0, 100, 1.0, clip_router).unwrap();
         let scheduled_event = ScheduledEvent::new(&note, NoteState::On, 0);    
         let playback_event = PlaybackEvent::from(&scheduled_event);
     
