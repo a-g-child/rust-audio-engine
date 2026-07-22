@@ -46,6 +46,11 @@ impl Scheduler {
         Ok(())
     }
 
+    pub fn reset(&mut self) {
+        self.cursor = None;
+        self.last_transport_beat = None;
+    }
+
     pub fn advance_window<'a, I>(
         &mut self,
         routed_notes: I,
@@ -261,12 +266,21 @@ impl Scheduler {
         }
     }
 
+    fn event_order(event: &ScheduledEvent<'_>) -> u8 {
+        match event.state() {
+            NoteState::Off => 0,
+            NoteState::On => 1,
+        }
+    }
+
     fn sort_events(events: &mut [ScheduledEvent<'_>]) {
         events.sort_by(|a, b| {
             a.beat()
                 .total_cmp(&b.beat())
-                .then_with(|| a.state().cmp(&b.state()))
+                .then_with(|| Self::event_order(a).cmp(&Self::event_order(b)))
+                .then_with(|| a.occurrence_key().placement_id().cmp(b.occurrence_key().placement_id()))
                 .then_with(|| a.note().id().cmp(b.note().id()))
+                .then_with(|| a.occurrence_key().loop_iteration().cmp(&b.occurrence_key().loop_iteration()))
         });
     }
 

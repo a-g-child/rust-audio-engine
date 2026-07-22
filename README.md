@@ -57,25 +57,22 @@ cargo test
 
 ## Example
 
-The binary currently demonstrates basic tempo and transport usage:
+The binary now demonstrates the full end-to-end flow:
 
-```rust
-use engine_lab::tempo::Tempo;
-use engine_lab::transport::Transport;
+- builds notes, clips, placements, and routes through `ClipRouter`
+- materializes an `ArrangementView`
+- advances `PlaybackPipeline` against `Transport` + `Tempo`
+- emits timed playback events (`sample_position` deadlines)
+- evaluates all-or-nothing mutation guards using both anonymous and named batch APIs
+- performs reset panic-note-off flushing
 
-fn main() {
-    let tempo = Tempo::new(120.0, 44_100, (4, 4));
-    let mut transport = Transport::new();
+Run it with:
 
-    transport.play();
-    transport.advance_s(44_100);
-
-    println!("Beat position: {}", transport.beat_position(&tempo));
-    println!("Bar position: {}", transport.bar_position(&tempo));
-}
+```sh
+cargo run
 ```
 
-At 120 BPM and 44.1 kHz, advancing by 44,100 samples moves the transport by one second, which is two beats.
+Inspect the source for the complete walkthrough in `src/main.rs`.
 
 ## Crate Layout
 

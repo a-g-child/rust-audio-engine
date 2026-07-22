@@ -2,6 +2,7 @@
 //! Conversion from scheduler-owned types is handled in `mapper`.
 
 use crate::playback::enums::PlaybackEventKind;
+use crate::scheduler::NoteOccurrenceKey;
 // use crate::playback::mapper::SchedulerEventMapper;
 use uuid::Uuid;
 /// Represents a playback event, which is a note event that can be consumed by the playback layer.
@@ -9,6 +10,7 @@ use uuid::Uuid;
 pub struct PlaybackEvent {
     pub beat: f64,
     pub note_id: Uuid,
+    pub occurrence_key: NoteOccurrenceKey,
     pub probability: u8, 
     pub channel: u8,
     pub kind: PlaybackEventKind,
@@ -22,9 +24,11 @@ mod tests {
     #[test]
     fn test_playback_event_fields() {
         let note_id = Uuid::new_v4();
+        let occurrence_key = NoteOccurrenceKey::new(note_id, Uuid::new_v4(), 0);
         let playback_event = PlaybackEvent {
             beat: 0.0,
             note_id,
+            occurrence_key,
             probability: 127, 
             channel: 1,
             kind: PlaybackEventKind::NoteOn{note: 100, velocity: 127},
@@ -32,6 +36,7 @@ mod tests {
 
         assert_eq!(playback_event.beat, 0.0);
         assert_eq!(playback_event.note_id, note_id);
+        assert_eq!(playback_event.occurrence_key, occurrence_key);
         match playback_event.kind {
             PlaybackEventKind::NoteOn { note, velocity } => {
                 assert_eq!(note, 100);

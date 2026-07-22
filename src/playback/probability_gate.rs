@@ -35,6 +35,10 @@ impl ProbabilityGate {
         }
     }
 
+    pub fn clear(&mut self) {
+        self.accepted_occurrences.clear();
+    }
+
     fn handle_note_off(&mut self, event: &ScheduledEvent<'_>, probabilities: &Probabilities, id: Uuid, occurrence_key: NoteOccurrenceKey) -> Option<PlaybackEvent> {
         if probabilities.get(&id).is_none() {
             return Some(PlaybackEvent::from(event));

@@ -6,13 +6,12 @@ use crate::playback::enums::{ProbabilityTarget, ProbabilityError};
 /// Represents a probability associated with a specific target (e.g., note, parameter, clip).
 pub struct Probability {
     chance: u8,
-    applied: bool,
     target: ProbabilityTarget,
 }
 // Implement methods for Probability
 impl  Probability {
     pub fn new(chance: u8, target: ProbabilityTarget) -> Self {
-        Probability { chance, applied: false, target }
+        Probability { chance, target }
     }
 
     pub fn chance(&self) -> u8 {
@@ -44,54 +43,43 @@ impl Probabilities {
         }
     }
     /// Validates the UUID to ensure it is not nil and exists in the probabilities map.
-    fn validate_uuid(&self, note_id: &Uuid) -> Result<(), ProbabilityError> {
-        if note_id.is_nil() {
+    fn validate_uuid(&self, target_id: &Uuid) -> Result<(), ProbabilityError> {
+        if target_id.is_nil() {
             Err(ProbabilityError::NilTargetId)
         } else {
             Ok(())
         }
     }
     /// Validates both the chance value and the UUID for a given probability entry.
-    fn validate(&self, note_id: &Uuid, chance: u8) -> Result<(), ProbabilityError> { 
+    fn validate(&self, target_id: &Uuid, chance: u8) -> Result<(), ProbabilityError> {
         Self::validate_chance(chance)?;
-        self.validate_uuid(note_id)?;
+        self.validate_uuid(target_id)?;
         Ok(())
     }
     /// Adds a new probability entry to the collection, validating the chance and UUID. 
-    pub fn add(&mut self, note_id: Uuid, chance: u8, target: ProbabilityTarget) -> Result<(), ProbabilityError> {
-        self.validate(&note_id , chance)?;
-        self.probabilities.insert(note_id, Probability { chance, applied: false, target });
+    pub fn add(&mut self, target_id: Uuid, chance: u8, target: ProbabilityTarget) -> Result<(), ProbabilityError> {
+        self.validate(&target_id, chance)?;
+        self.probabilities.insert(target_id, Probability { chance, target });
         Ok(())
     }
     /// Updates an existing probability entry, validating the chance and UUID.
-    pub fn update(&mut self, note_id: &Uuid, chance: u8, target: ProbabilityTarget) -> Result<(), ProbabilityError> {
+    pub fn update(&mut self, target_id: &Uuid, chance: u8, target: ProbabilityTarget) -> Result<(), ProbabilityError> {
         Self::validate_chance(chance)?;
-        if let Some(probability) = self.probabilities.get_mut(note_id) {
+        if let Some(probability) = self.probabilities.get_mut(target_id) {
             probability.chance = chance;
             probability.target = target;
             Ok(())
         } else {
-            Err(ProbabilityError::TargetNotFound(*note_id))
+            Err(ProbabilityError::TargetNotFound(*target_id))
         }
     }
     /// Retrieves a probability entry by its UUID, returning an Option.
-    pub fn get(&self, note_id: &Uuid) -> Option<&Probability> {
-        self.probabilities.get(note_id)
+    pub fn get(&self, target_id: &Uuid) -> Option<&Probability> {
+        self.probabilities.get(target_id)
     }
     /// Removes a probability entry by its UUID, if it exists.
-    pub fn remove(&mut self, note_id: &Uuid) {
-        self.probabilities.remove(note_id);
-    }
-    pub fn set_applied(&mut self, note_id: &Uuid, applied: bool) -> Result<(), ProbabilityError> {
-        if let Some(probability) = self.probabilities.get_mut(note_id) {
-            probability.applied = applied;
-            Ok(())
-        } else {
-            Err(ProbabilityError::TargetNotFound(*note_id))
-        }
-    }
-    pub fn applied(&self, note_id: &Uuid) -> Option<bool> {
-        self.probabilities.get(note_id).map(|p| p.applied)
+    pub fn remove(&mut self, target_id: &Uuid) {
+        self.probabilities.remove(target_id);
     }
     /// Clears all probability entries from the collection.
     pub fn clear(&mut self) {
@@ -106,8 +94,8 @@ impl Probabilities {
         self.probabilities.is_empty()
     }
     /// Checks if a probability entry exists for the given UUID.
-    pub fn contains(&self, note_id: &Uuid) -> bool {
-        self.probabilities.contains_key(note_id)
+    pub fn contains(&self, target_id: &Uuid) -> bool {
+        self.probabilities.contains_key(target_id)
     }
 
 }
@@ -186,19 +174,6 @@ mod tests {
         let non_existent_id = Uuid::new_v4();
         assert!(!probabilities.contains(&non_existent_id));
     }
-
-    #[test]
-    fn applied_flag() {
-        let mut probabilities = Probabilities::new();
-        let note_id = Uuid::new_v4();
-        probabilities.add(note_id, 50, ProbabilityTarget::Note).unwrap();
-        
-        assert_eq!(probabilities.applied(&note_id), Some(false));
-        
-        probabilities.set_applied(&note_id, true).unwrap();
-        assert_eq!(probabilities.applied(&note_id), Some(true));
-    }
-
 
 }
 

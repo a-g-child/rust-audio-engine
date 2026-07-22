@@ -17,6 +17,7 @@ impl From<&ScheduledEvent<'_>> for PlaybackEvent {
             NoteState::On => PlaybackEvent {
                 beat: event.beat(),
                 note_id: *note.id(),
+                occurrence_key: event.occurrence_key(),
                 probability: 127,
                 channel,
                 kind: PlaybackEventKind::NoteOn {
@@ -27,6 +28,7 @@ impl From<&ScheduledEvent<'_>> for PlaybackEvent {
             NoteState::Off => PlaybackEvent {
                 beat: event.beat(),
                 note_id: *note.id(),
+                occurrence_key: event.occurrence_key(),
                 probability: 127,
                 channel,
                 kind: PlaybackEventKind::NoteOff {
