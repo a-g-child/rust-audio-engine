@@ -37,7 +37,6 @@ mod tests {
             beat: 1.5,
             note_id,
             occurrence_key: key,
-            probability: 127,
             channel: 1,
             kind: PlaybackEventKind::NoteOn {
                 note: 64,

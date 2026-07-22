@@ -1,4 +1,4 @@
-use crate::playback::{PlaybackEvent, PlaybackEventKind};
+use crate::playback::{PlaybackEvent, PlaybackEventKind, TimedPlaybackEvent};
 use crate::scheduler::NoteOccurrenceKey;
 use std::collections::HashMap;
 
@@ -23,18 +23,32 @@ impl ActiveNotes {
     }
 
     pub fn track_event(&mut self, event: &PlaybackEvent) {
-        match event.kind {
+        self.track_kind(event.occurrence_key, event.note_id, event.channel, event.kind);
+    }
+
+    pub fn track_timed_event(&mut self, event: &TimedPlaybackEvent) {
+        self.track_kind(event.occurrence_key, event.note_id, event.channel, event.kind);
+    }
+
+    fn track_kind(
+        &mut self,
+        occurrence_key: NoteOccurrenceKey,
+        note_id: uuid::Uuid,
+        channel: u8,
+        kind: PlaybackEventKind,
+    ) {
+        match kind {
             PlaybackEventKind::NoteOn { note, .. } => {
                 let active_note = ActiveNote {
-                    occurrence_key: event.occurrence_key,
-                    note_id: event.note_id,
+                    occurrence_key,
+                    note_id,
                     note,
-                    channel: event.channel,
+                    channel,
                 };
-                self.active.insert(event.occurrence_key, active_note);
+                self.active.insert(occurrence_key, active_note);
             }
             PlaybackEventKind::NoteOff { .. } => {
-                self.active.remove(&event.occurrence_key);
+                self.active.remove(&occurrence_key);
             }
             _ => {}
         }
@@ -48,7 +62,35 @@ impl ActiveNotes {
                 beat,
                 note_id: active.note_id,
                 occurrence_key: active.occurrence_key,
-                probability: 127,
+                channel: active.channel,
+                kind: PlaybackEventKind::NoteOff { note: active.note },
+            })
+            .collect();
+
+        out.sort_by(|a, b| {
+            a.occurrence_key
+                .placement_id()
+                .cmp(b.occurrence_key.placement_id())
+                .then_with(|| a.note_id.cmp(&b.note_id))
+                .then_with(|| {
+                    a.occurrence_key
+                        .loop_iteration()
+                        .cmp(&b.occurrence_key.loop_iteration())
+                })
+        });
+
+        self.active.clear();
+        out
+    }
+
+    pub fn panic_note_offs_timed(&mut self, sample_position: u64) -> Vec<TimedPlaybackEvent> {
+        let mut out: Vec<TimedPlaybackEvent> = self
+            .active
+            .values()
+            .map(|active| TimedPlaybackEvent {
+                sample_position,
+                note_id: active.note_id,
+                occurrence_key: active.occurrence_key,
                 channel: active.channel,
                 kind: PlaybackEventKind::NoteOff { note: active.note },
             })
@@ -88,7 +130,6 @@ mod tests {
             beat: 1.0,
             note_id,
             occurrence_key: key,
-            probability: 127,
             channel: 1,
             kind: PlaybackEventKind::NoteOn {
                 note: 64,
@@ -106,5 +147,31 @@ mod tests {
 
         // Flush should clear state.
         assert!(active.panic_note_offs(3.0).is_empty());
+    }
+
+    #[test]
+    fn tracks_timed_events_and_flushes_timed_panic_offs() {
+        let key = NoteOccurrenceKey::new(uuid::Uuid::new_v4(), uuid::Uuid::new_v4(), 1);
+        let note_id = *key.note_id();
+
+        let on = TimedPlaybackEvent {
+            sample_position: 100,
+            note_id,
+            occurrence_key: key,
+            channel: 1,
+            kind: PlaybackEventKind::NoteOn {
+                note: 67,
+                velocity: 96,
+            },
+        };
+
+        let mut active = ActiveNotes::new();
+        active.track_timed_event(&on);
+
+        let panic_offs = active.panic_note_offs_timed(200);
+        assert_eq!(panic_offs.len(), 1);
+        assert_eq!(panic_offs[0].sample_position, 200);
+        assert_eq!(panic_offs[0].kind, PlaybackEventKind::NoteOff { note: 67 });
+        assert!(active.panic_note_offs_timed(300).is_empty());
     }
 }

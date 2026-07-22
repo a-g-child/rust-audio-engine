@@ -11,7 +11,6 @@ pub struct PlaybackEvent {
     pub beat: f64,
     pub note_id: Uuid,
     pub occurrence_key: NoteOccurrenceKey,
-    pub probability: u8, 
     pub channel: u8,
     pub kind: PlaybackEventKind,
 }
@@ -29,7 +28,6 @@ mod tests {
             beat: 0.0,
             note_id,
             occurrence_key,
-            probability: 127, 
             channel: 1,
             kind: PlaybackEventKind::NoteOn{note: 100, velocity: 127},
         };

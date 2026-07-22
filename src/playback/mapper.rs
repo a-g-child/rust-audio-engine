@@ -18,7 +18,6 @@ impl From<&ScheduledEvent<'_>> for PlaybackEvent {
                 beat: event.beat(),
                 note_id: *note.id(),
                 occurrence_key: event.occurrence_key(),
-                probability: 127,
                 channel,
                 kind: PlaybackEventKind::NoteOn {
                     note: note.note(),
@@ -29,7 +28,6 @@ impl From<&ScheduledEvent<'_>> for PlaybackEvent {
                 beat: event.beat(),
                 note_id: *note.id(),
                 occurrence_key: event.occurrence_key(),
-                probability: 127,
                 channel,
                 kind: PlaybackEventKind::NoteOff {
                     note: note.note(),

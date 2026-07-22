@@ -1,6 +1,6 @@
 
 use engine_lab::clips::{ArrangementView, Clip, ClipPlacement, ClipPlacements, ClipPlaybackMode, ClipRouter, Clips};
-use engine_lab::playback::{MutationBatch, MutationBatchDecision, PlaybackEventKind, PlaybackPipeline, Probabilities, ProbabilityTarget};
+use engine_lab::playback::{MutationBatch, MutationBatchDecision, PlaybackEventKind, PlaybackRuntime, Probabilities, ProbabilityTarget};
 use engine_lab::scheduler::ScheduledNote;
 use engine_lab::tempo::Tempo;
 use engine_lab::transport::Transport;
@@ -68,8 +68,11 @@ fn main() {
         .add(*notes[2].id(), 100, ProbabilityTarget::Note)
         .expect("fill probability");
 
-    let mut pipeline = PlaybackPipeline::new();
-    pipeline.set_lookahead(0.5).expect("lookahead set");
+    let mut runtime = PlaybackRuntime::new();
+    runtime
+        .pipeline_mut()
+        .set_lookahead(0.5)
+        .expect("lookahead set");
 
     let mut transport = Transport::new();
     transport.play();
@@ -77,10 +80,17 @@ fn main() {
 
     println!("== Engine slice demo ==");
     for tick in 0..8 {
-        let timed_events = pipeline.advance_timed(&arrangement, &transport, &tempo, &probabilities);
+        let scheduled_count = runtime
+            .schedule(&arrangement, &transport, &tempo, &probabilities)
+            .expect("schedule succeeds");
+
+        let block_end_sample = transport.sample_position() + tempo.beats_to_samples(0.25);
+        let timed_events = runtime.process_until(block_end_sample);
+
         println!(
-            "tick={tick:02} beat={:.2} events={}",
+            "tick={tick:02} beat={:.2} scheduled={} executed={}",
             transport.beat_position(&tempo),
+            scheduled_count,
             timed_events.len()
         );
 
@@ -96,7 +106,7 @@ fn main() {
         transport.advance_b(0.25, &tempo);
     }
 
-    if let Some(horizon) = pipeline.committed_horizon_beat() {
+    if let Some(horizon) = runtime.pipeline().committed_horizon_beat() {
         println!("committed_horizon_beat={horizon:.3}");
 
         let mut risky_batch = MutationBatch::new();
@@ -104,7 +114,7 @@ fn main() {
             .add("move_loop_earlier", horizon - 0.25)
             .add("retime_fill", horizon + 0.25);
 
-        match pipeline.mutation_decision_for_named_batch(&risky_batch) {
+        match runtime.pipeline().mutation_decision_for_named_batch(&risky_batch) {
             MutationBatchDecision::Allowed => {
                 println!("risky batch unexpectedly allowed");
             }
@@ -124,13 +134,14 @@ fn main() {
             .add("move_loop_later", horizon + 0.25)
             .add("retime_fill", horizon + 0.5);
 
-        let applied = pipeline
+        let applied = runtime
+            .pipeline()
             .apply_if_mutable_named_batch(&safe_batch, || "safe batch applied")
             .expect("safe batch should apply");
         println!("{applied}");
     }
 
-    let panic_offs = pipeline.reset_with_panic_note_offs_timed(transport.beat_position(&tempo), &tempo);
+    let panic_offs = runtime.stop(transport.sample_position(), &mut transport);
     println!("panic note offs generated on reset: {}", panic_offs.len());
 }
 

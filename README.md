@@ -113,5 +113,6 @@ Related scheduler detail:
 Pipeline summary:
 
 ```text
-Tempo + Transport -> Clips (ArrangementView/ClipRouter) -> Scheduler -> Playback (ProbabilityGate + PlaybackEvent)
+Tempo + Transport -> Clips (ArrangementView/ClipRouter) -> Scheduler -> PlaybackPipeline (ProbabilityGate)
+        -> TimedPlaybackEvent -> PlaybackQueue -> PlaybackExecutor (ActiveNotes)
 ```
