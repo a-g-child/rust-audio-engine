@@ -4,11 +4,12 @@ use uuid::Uuid;
 pub struct ClipRouter {
     router_id: Uuid,
     clip_id: Uuid,
+    clip_placement_id: Uuid, // Optional field to store the clip placement ID
 }
 
 impl ClipRouter {
-    pub fn new(clip_id: Uuid) -> Self {
-        Self { router_id: Uuid::new_v4(), clip_id }
+    pub fn new(clip_id: Uuid, clip_placement_id: Uuid) -> Self {
+        Self { router_id: Uuid::new_v4(), clip_id, clip_placement_id }
     }
 
     pub fn router_id(&self) -> &Uuid {
@@ -19,8 +20,15 @@ impl ClipRouter {
         &self.clip_id
     }
 
+    pub fn clip_placement_id(&self) -> &Uuid {
+        &self.clip_placement_id
+    }
+
     pub fn migrate_clip(&mut self, new_clip_id: Uuid) {
         self.clip_id = new_clip_id;
+    }
+    pub fn migrate_clip_placement(&mut self, new_clip_placement_id: Uuid) {
+        self.clip_placement_id = new_clip_placement_id;
     }
 }
 
@@ -31,7 +39,9 @@ mod tests {
     #[test]
     fn create_clip_router() {
         let clip_id = Uuid::new_v4();
-        let router = ClipRouter::new(clip_id);
+        let clip_placement_id = Uuid::new_v4();
+        let router = ClipRouter::new(clip_id, clip_placement_id);
         assert_eq!(router.clip_id(), &clip_id);
+        assert_eq!(router.clip_placement_id(), &clip_placement_id);
     }
 }

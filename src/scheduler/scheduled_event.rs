@@ -19,6 +19,7 @@
 use crate::scheduler::enums::NoteState;
 use crate::scheduler::scheduled_note::ScheduledNote;
 use crate::scheduler::occurrence::NoteOccurrenceKey;
+use uuid::Uuid;
 
 /// Represents a scheduled event for a note, either turning it on or off at a specific beat position, 
 /// note consists of a reference to a `ScheduledNote` which contains the note's properties.
@@ -62,7 +63,7 @@ impl<'a> ScheduledEvent<'a> {
     }
 
     pub fn occurrence_key(&self) -> NoteOccurrenceKey {
-        NoteOccurrenceKey::new(*self.note.id(), self.loop_iteration)
+        NoteOccurrenceKey::new(*self.note.id(), *self.note.id(),  self.loop_iteration)
     }
 
     pub fn print(&self) {
