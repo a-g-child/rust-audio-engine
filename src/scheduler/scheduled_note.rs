@@ -20,7 +20,6 @@
 //! - ScheduledEvent instances (which borrow ScheduledNote instances)
 
 use uuid::Uuid;
-use crate::clips::clip_router::{self, ClipRouter};
 use crate::scheduler::enums::ScheduledNoteError;
 
 const MAX_BEAT: f64 = 1.0e12; // Arbitrary large value to prevent overflow in calculations
@@ -33,11 +32,10 @@ pub struct ScheduledNote {
     end_beat: f64,
     note: u8,
     velocity: u8,
-    clip_router: ClipRouter, // can be used to route the note to different clips or tracks
 }
 
 impl ScheduledNote {
-    pub fn new(start_beat: f64, note: u8, length: f64, clip_router: ClipRouter) -> Result<Self, ScheduledNoteError> {
+    pub fn new(start_beat: f64, note: u8, length: f64) -> Result<Self, ScheduledNoteError> {
         if start_beat < 0.0 {
             return Err(ScheduledNoteError::InvalidStartBeat);
         }
@@ -65,7 +63,6 @@ impl ScheduledNote {
             note,
             end_beat,
             velocity: 127,
-            clip_router,
         })
     }
     /// Gets the unique identifier of the scheduled note.
@@ -127,8 +124,7 @@ mod tests {
 
     #[test]
     fn create() {
-        let clip_router = ClipRouter::new(Uuid::new_v4());
-        let mut note = ScheduledNote::new(0.0, 60, 2.0, clip_router).unwrap();
+        let mut note = ScheduledNote::new(0.0, 60, 2.0).unwrap();
         assert_eq!(note.start_beat(), 0.0);
         assert_eq!(note.end_beat(), 2.0);
         assert_eq!(note.length(), 2.0);
@@ -141,8 +137,7 @@ mod tests {
     
     #[test]
     fn errors() {
-        let clip_router = ClipRouter::new(Uuid::new_v4());
-        let mut note = ScheduledNote::new(0.0, 60, 2.0, clip_router).unwrap();
+        let mut note = ScheduledNote::new(0.0, 60, 2.0).unwrap();
 
         assert!(note.set_length(-1.0).is_err());
         assert!(note.set_length(f64::NAN).is_err());

@@ -1,5 +1,9 @@
 use uuid::Uuid;
+use std::collections::HashMap;
 
+pub struct ClipPlacements {
+    placements: HashMap<Uuid, ClipPlacement>,
+}
 
 
 /// where that clip appears globally how long that placement exists
@@ -55,6 +59,28 @@ impl ClipPlacement {
 
     pub fn length(&self) -> f64 {
         self.length
+    }
+}
+
+impl ClipPlacements {
+    pub fn new() -> Self {
+        Self {
+            placements: HashMap::new(),
+        }
+    }
+
+    pub fn add(&mut self, placement: ClipPlacement) -> Uuid {
+        let id = *placement.id();
+        self.placements.insert(id, placement);
+        id
+    }
+
+    pub fn get(&self, id: &Uuid) -> Option<&ClipPlacement> {
+        self.placements.get(id)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &ClipPlacement> {
+        self.placements.values()
     }
 }
 

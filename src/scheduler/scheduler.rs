@@ -1,62 +1,35 @@
 //! Scheduler Module
 //!
 //! Responsibility:
-//! - manage scheduling of events based on tempo and transport state
-//! - calculate the next event time based on tempo and transport state
-//! - provide a collection of events that occur within the lookahead window
-//! - schedule events in chronological order based on their beat positions
-//! - provide a way to set the lookahead value for scheduling events
-//! - provide a way to collect events that occur within the lookahead window starting from a given beat position
-//!
-//! Invariants:
-//! - events can be stored at any time
-//! - scheduled events are always sorted by beat position
-//! - all contained events are valid
-//! - beat positions are always non-negative and finite
-//! - lookahead is always finite and non-negative
-//!
-//! Owns:
-//! - Event collection
-//! - lookahead value
-//! - schdeuler cursor position
-//! - Model for notes
-//!
-//! Does Not Own:
-//! - Tempo (BPM, beat position, time signature)
-//! - Transport (playback state, sample position, playback speed)
-//! - Audio
-//! - Midi
+//! - calculate scheduling windows from transport/tempo
+//! - materialize note-edge events from routing-resolved note inputs
+//! - return events sorted by beat/state/id
 
+use crate::clips::{ClipPlaybackMode, RoutedNote};
+use crate::scheduler::enums::{NoteState, SchedulerError};
+use crate::scheduler::occurrence::NoteOccurrenceKey;
 use crate::scheduler::scheduled_event::ScheduledEvent;
-use crate::scheduler::scheduled_note::ScheduledNote;
 use crate::tempo::Tempo;
 use crate::transport::Transport;
-use crate::scheduler::enums::{NoteState, SchedulerError};
 use crate::transport::TransportState;
 
-/// Stores notes in scheduling order and emits note-edge events
-/// for a configurable lookahead window.  
+/// Collects global note-edge events for a lookahead window.
 pub struct Scheduler {
-    notes: Vec<ScheduledNote>,
     lookahead: f64,
     cursor: Option<f64>,
     last_transport_beat: Option<f64>,
 }
 
 impl Scheduler {
-    /// Creates a new instance of the Scheduler with an empty event
-    /// list and a default lookahead value of 4.0 beats.
+    /// Creates a scheduler with a default 4-beat lookahead.
     pub fn new() -> Self {
         Scheduler {
-            notes: Vec::new(),
             lookahead: 4.0,
             cursor: None,
             last_transport_beat: None,
         }
     }
 
-    /// Gets the cursor position of the scheduler, which represents
-    /// the limit of scheduled events.
     pub fn cursor(&self) -> Option<f64> {
         self.cursor
     }
@@ -65,17 +38,6 @@ impl Scheduler {
         self.last_transport_beat
     }
 
-    /// Schedules a new note in the scheduler. The note is inserted
-    /// into the notes vector in sorted order based on its start beat position.
-    pub fn schedule_note(&mut self, event: ScheduledNote) {
-        let position = self.notes.partition_point(|s_event| {
-            Self::compare_notes_for_scheduling(s_event, &event) == std::cmp::Ordering::Less
-        });
-        self.notes.insert(position, event);
-    }
-
-    /// Sets the lookahead value for the scheduler. The lookahead determines
-    /// how far ahead in beats the scheduler will consider events for processing.
     pub fn set_lookahead(&mut self, lookahead: f64) -> Result<(), SchedulerError> {
         if lookahead < 0.0 || !lookahead.is_finite() {
             return Err(SchedulerError::InvalidLookahead);
@@ -84,69 +46,165 @@ impl Scheduler {
         Ok(())
     }
 
-    /// Returns the number of scheduled notes in the scheduler.
-    pub fn notes_count(&self) -> usize {
-        self.notes.len()
-    }
-
-    /// Advances the scheduling window based on the current transport state and tempo.
-    pub fn advance_window(&mut self, transport: &Transport, tempo: &Tempo,) -> Result<Vec<ScheduledEvent<'_>>, SchedulerError> {
-
+    pub fn advance_window<'a, I>(
+        &mut self,
+        routed_notes: I,
+        transport: &Transport,
+        tempo: &Tempo,
+    ) -> Result<Vec<ScheduledEvent<'a>>, SchedulerError>
+    where
+        I: IntoIterator<Item = RoutedNote<'a>>,
+    {
         let (window_start, window_end) = self.compute_window(transport, tempo);
-        let loop_iteration = transport.loop_iteration();
-        if window_end == window_start { return Ok(Vec::new()); } // If the window is zero width, return an empty vector
+        if window_end == window_start {
+            return Ok(Vec::new());
+        }
+
         self.validate_window(window_start, window_end)?;
         self.commit_window_progress(window_end, transport, tempo)?;
-        let events = Self::collect_events_in_window(&self.notes, window_start, window_end, loop_iteration);
-       
+
+        let mut events = Self::collect_events_in_window(routed_notes, window_start, window_end);
+        Self::sort_events(&mut events);
         Ok(events)
     }
 
-}
+    fn collect_events_in_window<'a, I>(
+        routed_notes: I,
+        window_start: f64,
+        window_end: f64,
+    ) -> Vec<ScheduledEvent<'a>>
+    where
+        I: IntoIterator<Item = RoutedNote<'a>>,
+    {
+        let mut events: Vec<ScheduledEvent<'a>> = Vec::new();
 
-impl Scheduler{
-
-    /// Collects all scheduled events that occur within the specified scheduling window.
-    fn collect_events_in_window<'a>( notes: &'a [ScheduledNote], window_start: f64, window_end: f64, loop_iteration: u64,) -> Vec<ScheduledEvent<'a>> {
-        
-        let mut events: Vec<ScheduledEvent<'_>> = Vec::new();
-
-        for note in notes {
-            Self::collect_note_events(window_start, window_end, &mut events, note, loop_iteration);
+        for routed in routed_notes {
+            Self::collect_routed_note_events(window_start, window_end, &mut events, routed);
         }
-        // Additional sort by state then id in event of same beat position.
-        Self::sort_events(&mut events);
 
         events
     }
 
-    /// Inserts a note event into the scheduler's notes vector in sorted order based on its start beat position.
-    fn collect_note_events<'a>( window_start: f64,
+    fn collect_routed_note_events<'a>(
+        window_start: f64,
         window_end: f64,
         events: &mut Vec<ScheduledEvent<'a>>,
-        note: &'a ScheduledNote,
-        loop_iteration: u64,
+        routed: RoutedNote<'a>,
     ) {
-        let s = note.start_beat();
-        let e = note.end_beat();
-
-        // Start occurrence in window => NoteState::On
-        if s >= window_start && s < window_end {
-            // if the start beat of the note is within the scheduling window,
-            // create a ScheduledEvent with NoteState::On and add it to the output vector
-            events.push(ScheduledEvent::new(note, NoteState::On, loop_iteration));
-        }
-
-        // End occurrence in window => NoteState::Off
-        if e >= window_start && e < window_end {
-            // if the end beat of the note is within the scheduling window,
-            // create a ScheduledEvent with NoteState::Off and add it to the output vector
-            events.push(ScheduledEvent::new(note, NoteState::Off, loop_iteration));
+        match routed.clip_playback_mode() {
+            ClipPlaybackMode::OneShot => {
+                Self::push_one_shot_events(window_start, window_end, events, routed);
+            }
+            ClipPlaybackMode::Loop {
+                start_beat,
+                end_beat,
+            } => {
+                Self::push_loop_events(
+                    window_start,
+                    window_end,
+                    events,
+                    routed,
+                    start_beat,
+                    end_beat,
+                );
+            }
         }
     }
 
-    /// additonal sorting function to sort events by beat position, then by state (Off before On),
-    /// and finally by note ID for handling notes that share the same beat position and state.
+    fn push_one_shot_events<'a>(
+        window_start: f64,
+        window_end: f64,
+        events: &mut Vec<ScheduledEvent<'a>>,
+        routed: RoutedNote<'a>,
+    ) {
+        let note = routed.note();
+        let note_on = routed.placement_start_beat() + note.start_beat();
+        let note_off = routed.placement_start_beat() + note.end_beat();
+        let placement_end = routed.placement_end_beat();
+        let occurrence_key = NoteOccurrenceKey::new(*note.id(), routed.placement_id(), 0);
+
+        if note_on >= window_start
+            && note_on < window_end
+            && note_on >= routed.placement_start_beat()
+            && note_on < placement_end
+        {
+            events.push(ScheduledEvent::new(
+                note,
+                NoteState::On,
+                note_on,
+                occurrence_key,
+            ));
+        }
+
+        if note_off >= window_start
+            && note_off < window_end
+            && note_off >= routed.placement_start_beat()
+            && note_off < placement_end
+        {
+            events.push(ScheduledEvent::new(
+                note,
+                NoteState::Off,
+                note_off,
+                occurrence_key,
+            ));
+        }
+    }
+
+    fn push_loop_events<'a>(
+        window_start: f64,
+        window_end: f64,
+        events: &mut Vec<ScheduledEvent<'a>>,
+        routed: RoutedNote<'a>,
+        loop_start_beat: f64,
+        loop_end_beat: f64,
+    ) {
+        let loop_length = loop_end_beat - loop_start_beat;
+        if loop_length <= 0.0 || !loop_length.is_finite() {
+            return;
+        }
+
+        let note = routed.note();
+        let local_on = note.start_beat() - loop_start_beat;
+        let local_off = note.end_beat() - loop_start_beat;
+        let placement_start = routed.placement_start_beat();
+        let placement_end = routed.placement_end_beat();
+
+        let max_iterations = (routed.placement_length() / loop_length).ceil() as u64 + 1;
+        for iteration in 0..max_iterations {
+            let loop_offset = iteration as f64 * loop_length;
+            let note_on = placement_start + loop_offset + local_on;
+            let note_off = placement_start + loop_offset + local_off;
+            let occurrence_key =
+                NoteOccurrenceKey::new(*note.id(), routed.placement_id(), iteration);
+
+            if note_on >= window_start
+                && note_on < window_end
+                && note_on >= placement_start
+                && note_on < placement_end
+            {
+                events.push(ScheduledEvent::new(
+                    note,
+                    NoteState::On,
+                    note_on,
+                    occurrence_key,
+                ));
+            }
+
+            if note_off >= window_start
+                && note_off < window_end
+                && note_off >= placement_start
+                && note_off < placement_end
+            {
+                events.push(ScheduledEvent::new(
+                    note,
+                    NoteState::Off,
+                    note_off,
+                    occurrence_key,
+                ));
+            }
+        }
+    }
+
     fn sort_events(events: &mut [ScheduledEvent<'_>]) {
         events.sort_by(|a, b| {
             a.beat()
@@ -156,9 +214,7 @@ impl Scheduler{
         });
     }
 
-    /// Gets the scheduling window boundaries based on the current transport state and tempo.
     fn compute_window(&mut self, transport: &Transport, tempo: &Tempo) -> (f64, f64) {
-
         let current_beat = transport.beat_position(tempo);
         let mut window_start = self.cursor().unwrap_or(current_beat);
         if transport.state() == TransportState::Rewinding {
@@ -168,20 +224,9 @@ impl Scheduler{
         (window_start, window_end)
     }
 
-    // Compares two scheduled notes based on their start
-    /// beat positions and IDs for sorting purposes.
-    fn compare_notes_for_scheduling(a: &ScheduledNote, b: &ScheduledNote) -> std::cmp::Ordering {
-        a.start_beat()
-            .total_cmp(&b.start_beat())
-            .then_with(|| a.id().cmp(b.id()))
-    }
-
-    /// Sets the cursor position of the scheduler, which represents
-    /// the limit of scheduled events. The cursor must be non-negative and finite.
     fn validate_position(position: f64, error: SchedulerError) -> Result<(), SchedulerError> {
-        let err = error;
         if position < 0.0 || !position.is_finite() {
-            return Err(err);
+            return Err(error);
         }
         Ok(())
     }
@@ -197,14 +242,18 @@ impl Scheduler{
         self.last_transport_beat = Some(last_beat);
         Ok(())
     }
-    /// Commits the progress of the scheduling window by updating the last transport beat and cursor position.
-    fn commit_window_progress(&mut self, window_end: f64, transport: &Transport, tempo: &Tempo) -> Result<(), SchedulerError> {
+
+    fn commit_window_progress(
+        &mut self,
+        window_end: f64,
+        transport: &Transport,
+        tempo: &Tempo,
+    ) -> Result<(), SchedulerError> {
         self.update_last_transport_beat(transport.beat_position(tempo))?;
         self.update_cursor(window_end)?;
         Ok(())
     }
 
-    /// Validates the Sceduliing Window
     fn validate_window(&self, window_start: f64, window_end: f64) -> Result<(), SchedulerError> {
         if window_start < 0.0 || !window_start.is_finite() {
             return Err(SchedulerError::InvalidBeatStart);
@@ -217,23 +266,19 @@ impl Scheduler{
         }
         Ok(())
     }
-
 }
-
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uuid::Uuid;
-    use crate::clips::ClipRouter;
-
-    
+    use crate::clips::{
+        ArrangementView, Clip, ClipPlacement, ClipPlaybackMode, ClipPlacements, ClipRouter, Clips,
+    };
+    use crate::scheduler::ScheduledNote;
 
     #[test]
     fn creation_and_setters() {
         let mut scheduler = Scheduler::new();
-        assert_eq!(scheduler.notes_count(), 0);
         assert_eq!(scheduler.lookahead, 4.0);
 
         scheduler.set_lookahead(2.0).unwrap();
@@ -241,81 +286,97 @@ mod tests {
         assert!(scheduler.set_lookahead(-1.0).is_err());
         assert!(scheduler.set_lookahead(f64::NAN).is_err());
         assert!(scheduler.set_lookahead(f64::INFINITY).is_err());
-
-        assert!(scheduler.set_lookahead(-1.0).is_err());
-        assert!(scheduler.set_lookahead(f64::NAN).is_err());
-        assert!(scheduler.set_lookahead(f64::NEG_INFINITY).is_err());
-        assert!(scheduler.set_lookahead(f64::INFINITY).is_err());
     }
 
     #[test]
-    fn adds_event() {
-        let mut scheduler = Scheduler::new();
-        let clip_router = ClipRouter::new(Uuid::new_v4());
-        let event = ScheduledNote::new(0.0, 60, 2.0, clip_router).unwrap();
-        scheduler.schedule_note(event);
-        assert_eq!(scheduler.notes.len(), 1);
-        assert_eq!(scheduler.notes[0].start_beat(), 0.0);
-        assert_eq!(scheduler.notes[0].note(), 60);
-    }
+    fn one_shot_placement_resolves_global_beats() {
+        let note = ScheduledNote::new(1.0, 60, 0.5).unwrap();
 
-    #[test]
-    fn count() {
-        let clip_router = ClipRouter::new(Uuid::new_v4());
-        let mut scheduler = Scheduler::new();
-        scheduler.schedule_note(ScheduledNote::new(0.0, 60, 2.0,clip_router).unwrap());
-        scheduler.schedule_note(ScheduledNote::new(1.0, 62, 2.0, clip_router).unwrap());
-        assert_eq!(scheduler.notes_count(), 2);
-    }
+        let mut clips = Clips::new();
+        let clip = Clip::new(4.0, ClipPlaybackMode::OneShot).unwrap();
+        let clip_id = clips.add(clip);
 
-    #[test]
-    fn advance_window() {
+        let mut placements = ClipPlacements::new();
+        let placement_id = placements.add(ClipPlacement::new(clip_id, 16.0, 8.0).unwrap());
+
+        let mut router = ClipRouter::new();
+        router.route_note_to_clip(*note.id(), clip_id);
+        router.add_placement_to_clip(clip_id, placement_id);
+
+        let notes = vec![note];
+        let arrangement = ArrangementView::new(&notes, &clips, &placements, &router);
+        let routed_notes = arrangement.routed_notes();
+
         let mut scheduler = Scheduler::new();
-        let clip_router = ClipRouter::new(Uuid::new_v4());
-        scheduler.schedule_note(ScheduledNote::new(0.0, 60, 1.0, clip_router).unwrap());
-        scheduler.schedule_note(ScheduledNote::new(1.0, 62, 1.0, clip_router).unwrap());
-        scheduler.schedule_note(ScheduledNote::new(4.1, 64, 0.9, clip_router).unwrap());
-        scheduler.schedule_note(ScheduledNote::new(4.2, 64, 1.0, clip_router).unwrap());
-        scheduler.schedule_note(ScheduledNote::new(4.2, 64, 2.0, clip_router).unwrap());
+        scheduler.set_lookahead(8.0).unwrap();
 
         let mut transport = Transport::new();
         let tempo = Tempo::new(120.0, 44_100, (4, 4));
-
         transport.play();
-        println!(
-            "Transport is playing: {}, cursor at {:?}",
-            transport.is_playing(),
-            scheduler.cursor()
+        transport.set_sample_position(tempo.beats_to_samples(16.0));
+
+        let events = scheduler
+            .advance_window(routed_notes, &transport, &tempo)
+            .unwrap();
+
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].beat(), 17.0);
+        assert_eq!(events[1].beat(), 17.5);
+    }
+
+    #[test]
+    fn looped_clip_emits_per_iteration_occurrences() {
+        let note = ScheduledNote::new(1.0, 60, 0.5).unwrap();
+
+        let mut clips = Clips::new();
+        let clip = Clip::new(
+            4.0,
+            ClipPlaybackMode::Loop {
+                start_beat: 0.0,
+                end_beat: 4.0,
+            },
+        )
+        .unwrap();
+        let clip_id = clips.add(clip);
+
+        let mut placements = ClipPlacements::new();
+        let placement_id = placements.add(ClipPlacement::new(clip_id, 16.0, 12.0).unwrap());
+
+        let mut router = ClipRouter::new();
+        router.route_note_to_clip(*note.id(), clip_id);
+        router.add_placement_to_clip(clip_id, placement_id);
+
+        let notes = vec![note];
+        let arrangement = ArrangementView::new(&notes, &clips, &placements, &router);
+        let routed_notes = arrangement.routed_notes();
+
+        let mut scheduler = Scheduler::new();
+        scheduler.set_lookahead(32.0).unwrap();
+
+        let mut transport = Transport::new();
+        transport.play();
+
+        let tempo = Tempo::new(120.0, 44_100, (4, 4));
+        let events = scheduler
+            .advance_window(routed_notes, &transport, &tempo)
+            .unwrap();
+
+        assert!(events.iter().any(|e| e.beat() == 17.0));
+        assert!(events.iter().any(|e| e.beat() == 21.0));
+        assert!(events.iter().any(|e| e.beat() == 25.0));
+
+        let on_events: Vec<_> = events
+            .iter()
+            .filter(|e| e.state() == NoteState::On)
+            .collect();
+
+        assert_eq!(on_events.len(), 3);
+        assert_ne!(
+            *on_events[0].occurrence_key().placement_id(),
+            uuid::Uuid::nil()
         );
-        let events = scheduler.advance_window( &transport, &tempo).unwrap();
-        assert_eq!(events.len(), 4); // Should include events for notes starting at beat 0 and beat <4
-        println!("events = {}", events.len());
-        for event in &events {
-            event.print();
-        }
-        transport.advance_b(0.25, &tempo); // Advance by 1 second (120 BPM => 2 beats) 2-6, cursor at 4
-        println!(
-            "Transport is playing: {}, cursor at {:?}",
-            transport.is_playing(),
-            scheduler.cursor()
-        );
-        let events = scheduler.advance_window( &transport, &tempo).unwrap();
-        assert_eq!(events.len(), 3); // Should include events for notes starting at beat 4 and beat <6
-        println!("events = {}", events.len());
-        for event in &events {
-            event.print();
-        }
-        transport.advance_b(0.25, &tempo); // Advance by 1 second (120 BPM => 2 beats) 4-8, cursor at 6
-        println!(
-            "Transport is playing: {}, cursor at {:?}",
-            transport.is_playing(),
-            scheduler.cursor()
-        );
-        let events = scheduler.advance_window( &transport, &tempo).unwrap();
-        assert_eq!(events.len(), 0); // Should include events for notes starting at beat 4 and beat 1
-        println!("events = {}", events.len());
-        for event in &events {
-            event.print();
-        }
+        assert_eq!(on_events[0].occurrence_key().loop_iteration(), 0);
+        assert_eq!(on_events[1].occurrence_key().loop_iteration(), 1);
+        assert_eq!(on_events[2].occurrence_key().loop_iteration(), 2);
     }
 }

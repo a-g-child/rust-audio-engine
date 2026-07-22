@@ -41,13 +41,18 @@ impl From<&ScheduledEvent<'_>> for PlaybackEvent {
 mod tests {
     use super::*;
     use uuid::Uuid;
-    use crate::clips::ClipRouter;
+    use crate::scheduler::NoteOccurrenceKey;
 
 	#[test]
 	fn test_mapper() {
-        let clip_router = ClipRouter::new(Uuid::new_v4());
-		let note = crate::scheduler::ScheduledNote::new(0.0, 100, 1.0, clip_router).unwrap();
-        let scheduled_event = crate::scheduler::ScheduledEvent::new(&note, crate::scheduler::NoteState::On, 0); // Create a mock ScheduledEvent
+		let note = crate::scheduler::ScheduledNote::new(0.0, 100, 1.0).unwrap();
+        let occurrence_key = NoteOccurrenceKey::new(*note.id(), Uuid::new_v4(), 0);
+        let scheduled_event = crate::scheduler::ScheduledEvent::new(
+            &note,
+            crate::scheduler::NoteState::On,
+            0.0,
+            occurrence_key,
+        );
 		let playback_event: PlaybackEvent = (&scheduled_event).into();
 
 		assert_eq!(playback_event.beat, scheduled_event.beat());

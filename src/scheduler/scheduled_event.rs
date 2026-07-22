@@ -19,25 +19,31 @@
 use crate::scheduler::enums::NoteState;
 use crate::scheduler::scheduled_note::ScheduledNote;
 use crate::scheduler::occurrence::NoteOccurrenceKey;
-use uuid::Uuid;
 
 /// Represents a scheduled event for a note, either turning it on or off at a specific beat position, 
 /// note consists of a reference to a `ScheduledNote` which contains the note's properties.
 pub struct ScheduledEvent<'a> {
     note: &'a ScheduledNote,
     state: NoteState,
-    loop_iteration: u64,
+    scheduled_beat: f64,
+    occurrence_key: NoteOccurrenceKey,
 }
 
 impl<'a> ScheduledEvent<'a> {
     /// Creates a new instance of `ScheduledEvent` with the given note and state (On or Off). 
     /// The note is borrowed from the `ScheduledNote` to avoid ownership issues, and the state indicates whether the event is turning the note on or off.
-    pub fn new(note: &'a ScheduledNote, state: NoteState, loop_iteration: u64) -> Self {
+    pub fn new(
+        note: &'a ScheduledNote,
+        state: NoteState,
+        scheduled_beat: f64,
+        occurrence_key: NoteOccurrenceKey,
+    ) -> Self {
         // invariant already checked in ScheduledNote creation, so no need to check here.
         ScheduledEvent {
             note,
             state,
-            loop_iteration,
+            scheduled_beat,
+            occurrence_key,
         }
     }
     /// Gets the reference to   the associated `ScheduledNote`.
@@ -48,10 +54,7 @@ impl<'a> ScheduledEvent<'a> {
     /// because ScheduledNote stores two beat positions requiring a ScheduledEvent for each occurrence, 
     /// which is why we need to know which one is for the start and which one is for the end. 
     pub fn beat(&self) -> f64 {
-        match self.state {
-            NoteState::On  => self.note.start_beat(), // if the event is an "On" event, return the start beat of the scheduled note
-            NoteState::Off => self.note.end_beat(), // if the event is an "Off" event, return the end beat of the scheduled note
-        }
+        self.scheduled_beat
     }
     /// Gets the state (On or Off) of the scheduled event.
     pub fn state(&self) -> NoteState {
@@ -59,11 +62,11 @@ impl<'a> ScheduledEvent<'a> {
     }
 
     pub fn loop_iteration(&self) -> u64 {
-        self.loop_iteration
+        self.occurrence_key.loop_iteration()
     }
 
     pub fn occurrence_key(&self) -> NoteOccurrenceKey {
-        NoteOccurrenceKey::new(*self.note.id(), *self.note.id(),  self.loop_iteration)
+        self.occurrence_key
     }
 
     pub fn print(&self) {
@@ -78,15 +81,13 @@ mod tests {
     use super::*;
     use crate::scheduler::enums::NoteState;
     use crate::scheduler::scheduled_note::ScheduledNote;
-    use crate::clips::ClipRouter;
-    use uuid::Uuid;
 
     #[test]
     fn create() {
-        let clip_router = ClipRouter::new(Uuid::new_v4());
-        let note = ScheduledNote::new(0.0, 60, 2.0, clip_router).unwrap();
-        let event = ScheduledEvent::new(&note, NoteState::On, 0);
-        assert_eq!(event.beat(), 0.0);
+        let note = ScheduledNote::new(0.0, 60, 2.0).unwrap();
+        let occurrence_key = NoteOccurrenceKey::new(*note.id(), uuid::Uuid::new_v4(), 0);
+        let event = ScheduledEvent::new(&note, NoteState::On, 8.0, occurrence_key);
+        assert_eq!(event.beat(), 8.0);
         assert_eq!(event.state(), NoteState::On);
         assert_eq!(event.note().start_beat(), 0.0);
         assert_eq!(event.occurrence_key().note_id(), note.id());

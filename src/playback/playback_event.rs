@@ -18,8 +18,7 @@ pub struct PlaybackEvent {
 mod tests {
     use super::*;
     use uuid::Uuid;
-    use crate::scheduler::{ScheduledNote, ScheduledEvent, NoteState};
-    use crate::clips::ClipRouter;
+    use crate::scheduler::{NoteOccurrenceKey, NoteState, ScheduledEvent, ScheduledNote};
     #[test]
     fn test_playback_event_fields() {
         let note_id = Uuid::new_v4();
@@ -46,12 +45,9 @@ mod tests {
 
     #[test]
     fn test_mapper() {
-
-
-        let clip_router = ClipRouter::new(Uuid::new_v4());
-        let note = ScheduledNote::new(0.0, 100, 1.0, clip_router).unwrap();
-
-        let scheduled_event = ScheduledEvent::new(&note, NoteState::On, 0); // Create a mock ScheduledEvent
+        let note = ScheduledNote::new(0.0, 100, 1.0).unwrap();
+        let occurrence_key = NoteOccurrenceKey::new(*note.id(), Uuid::new_v4(), 0);
+        let scheduled_event = ScheduledEvent::new(&note, NoteState::On, 0.0, occurrence_key);
         let playback_event = PlaybackEvent::from(&scheduled_event);
 
         assert_eq!(playback_event.beat, scheduled_event.beat());
@@ -68,9 +64,9 @@ mod tests {
 
     #[test]
     fn map_note_off_event() {
-        let clip_router = ClipRouter::new(Uuid::new_v4());
-        let note = ScheduledNote::new(0.0, 100, 1.0, clip_router).unwrap();
-        let scheduled_event = ScheduledEvent::new(&note, NoteState::Off, 0);
+        let note = ScheduledNote::new(0.0, 100, 1.0).unwrap();
+        let occurrence_key = NoteOccurrenceKey::new(*note.id(), Uuid::new_v4(), 0);
+        let scheduled_event = ScheduledEvent::new(&note, NoteState::Off, 1.0, occurrence_key);
 
         let playback_event = PlaybackEvent::from(&scheduled_event);
 
@@ -81,10 +77,9 @@ mod tests {
     }
     #[test]
     fn map_note_on_event() {
-        use crate::clips::ClipRouter;
-        let clip_router = ClipRouter::new(Uuid::new_v4());
-        let note = ScheduledNote::new(0.0, 100, 1.0, clip_router).unwrap();
-        let scheduled_event = ScheduledEvent::new(&note, NoteState::On, 0);    
+        let note = ScheduledNote::new(0.0, 100, 1.0).unwrap();
+        let occurrence_key = NoteOccurrenceKey::new(*note.id(), Uuid::new_v4(), 0);
+        let scheduled_event = ScheduledEvent::new(&note, NoteState::On, 0.0, occurrence_key);
         let playback_event = PlaybackEvent::from(&scheduled_event);
     
         assert_eq!(

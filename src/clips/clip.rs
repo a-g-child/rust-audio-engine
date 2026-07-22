@@ -1,5 +1,10 @@
 use uuid::Uuid;
 use crate::clips::enums::{ClipPlaybackMode, ClipPlaybackModeError};
+use std::collections::HashMap;
+
+pub struct Clips {
+    clips: HashMap<Uuid, Clip>,
+}
 
 /// reusable musical content local length and looping behaviour
 #[derive(Debug)]
@@ -65,6 +70,28 @@ impl Clip {
 
     pub fn playback_mode(&self) -> ClipPlaybackMode {
         self.playback_mode
+    }
+}
+
+impl Clips {
+    pub fn new() -> Self {
+        Self {
+            clips: HashMap::new(),
+        }
+    }
+
+    pub fn add(&mut self, clip: Clip) -> Uuid {
+        let id = *clip.id();
+        self.clips.insert(id, clip);
+        id
+    }
+
+    pub fn get(&self, id: &Uuid) -> Option<&Clip> {
+        self.clips.get(id)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Clip> {
+        self.clips.values()
     }
 }
 

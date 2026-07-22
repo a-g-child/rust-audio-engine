@@ -75,9 +75,8 @@ impl ProbabilityGate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::clips::ClipRouter;
     use crate::playback::{Probabilities, ProbabilityTarget};
-    use crate::scheduler::{ScheduledEvent, ScheduledNote, NoteState};
+    use crate::scheduler::{NoteOccurrenceKey, NoteState, ScheduledEvent, ScheduledNote};
 
     #[test]
     fn roll_uses_deterministic_probability_boundaries() {
@@ -89,9 +88,9 @@ mod tests {
     fn test_filter_event_with_probability() {
         let mut probabilities = Probabilities::new();
         let mut probability = ProbabilityGate::new();
-        let clip_router = ClipRouter::new(Uuid::new_v4());
-        let note = ScheduledNote::new(0.0, 100, 1.0, clip_router).unwrap();
-        let scheduled_event = ScheduledEvent::new(&note, NoteState::On, 0);
+        let note = ScheduledNote::new(0.0, 100, 1.0).unwrap();
+        let occurrence_key = NoteOccurrenceKey::new(*note.id(), Uuid::new_v4(), 0);
+        let scheduled_event = ScheduledEvent::new(&note, NoteState::On, 0.0, occurrence_key);
         let id = *scheduled_event.note().id();
         probabilities.add(id, 50, ProbabilityTarget::Note).unwrap();
         // Since the probability is 50%, we can't guarantee the outcome, but we can check that it returns Some or None.
@@ -102,10 +101,10 @@ mod tests {
     fn event_with_zero_probability_gates_note_off() {
        let mut probabilities = Probabilities::new();
        let mut probability = ProbabilityGate::new();
-       let clip_router = ClipRouter::new(Uuid::new_v4());
-       let note = ScheduledNote::new(0.0, 100, 1.0, clip_router).unwrap();
-    let scheduled_event_on = ScheduledEvent::new(&note, NoteState::On, 0);
-    let scheduled_event_off = ScheduledEvent::new(&note, NoteState::Off, 0);
+         let note = ScheduledNote::new(0.0, 100, 1.0).unwrap();
+         let occurrence_key = NoteOccurrenceKey::new(*note.id(), Uuid::new_v4(), 0);
+     let scheduled_event_on = ScheduledEvent::new(&note, NoteState::On, 0.0, occurrence_key);
+     let scheduled_event_off = ScheduledEvent::new(&note, NoteState::Off, 1.0, occurrence_key);
        let id = *scheduled_event_on.note().id();
        println!("{}\n{}",*scheduled_event_on.note().id(), *scheduled_event_off.note().id());
        probabilities.add(id, 0, ProbabilityTarget::Note).unwrap();
