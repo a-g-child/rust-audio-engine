@@ -33,3 +33,15 @@ The scheduler crate materializes note-edge events (On/Off) in a lookahead window
 
 - The scheduler consumes RoutedNote inputs from the clips layer.
 - It should not own or traverse clip registries directly.
+
+## Loop Iteration Slicing
+
+For looping clips, the scheduler does not scan every loop occurrence from placement start on each advance.
+Instead, it computes a bounded iteration slice for the active lookahead window.
+
+- first_iteration = floor((window_start - placement_start) / loop_length)
+- last_iteration_exclusive = ceil((window_end - placement_start) / loop_length)
+
+Both values are clamped to valid placement iteration bounds and only that range is inspected.
+
+This keeps behavior deterministic while preventing repeated work for very long placements in late timeline windows.

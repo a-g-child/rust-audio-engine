@@ -1,3 +1,14 @@
+//! Clip placement management.
+//! 
+//! Respoonsibilities:
+//! - Track where clips are placed in the arrangement.
+//! 
+//! Owns: 
+//! - ClipPlacement
+//! 
+//! Does not own:
+//! - Clips
+
 use uuid::Uuid;
 use std::collections::HashMap;
 

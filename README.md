@@ -109,6 +109,10 @@ Execution-oriented flow:
 3. Event materialization window: [scheduler crate docs](src/scheduler/README.md)
 4. Playback mapping and gating: [playback crate docs](src/playback/README.md)
 
+Related scheduler detail:
+
+- [Loop iteration slicing strategy](src/scheduler/README.md#loop-iteration-slicing)
+
 Pipeline summary:
 
 ```text

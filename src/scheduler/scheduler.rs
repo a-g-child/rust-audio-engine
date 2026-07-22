@@ -111,6 +111,47 @@ impl Scheduler {
         }
     }
 
+    fn note_on_is_in_range(beat: f64, start: f64, end: f64) -> bool {
+        beat >= start && beat < end
+    }
+
+    fn note_off_is_in_range(beat: f64, start: f64, end: f64) -> bool {
+        beat >= start && beat <= end
+    }
+
+    fn loop_iteration_bounds(
+        window_start: f64,
+        window_end: f64,
+        placement_start: f64,
+        loop_length: f64,
+        max_iterations: u64,
+    ) -> Option<(u64, u64)> {
+        if max_iterations == 0 || loop_length <= 0.0 || !loop_length.is_finite() {
+            return None;
+        }
+
+        let first_iteration = if window_start <= placement_start {
+            0
+        } else {
+            ((window_start - placement_start) / loop_length).floor() as u64
+        };
+
+        let last_iteration_exclusive = if window_end <= placement_start {
+            0
+        } else {
+            ((window_end - placement_start) / loop_length).ceil() as u64
+        };
+
+        let first_iteration = first_iteration.min(max_iterations);
+        let last_iteration_exclusive = last_iteration_exclusive.min(max_iterations);
+
+        if first_iteration >= last_iteration_exclusive {
+            return None;
+        }
+
+        Some((first_iteration, last_iteration_exclusive))
+    }
+
     fn push_one_shot_events<'a>(
         window_start: f64,
         window_end: f64,
@@ -118,15 +159,16 @@ impl Scheduler {
         routed: RoutedNote<'a>,
     ) {
         let note = routed.note();
-        let note_on = routed.placement_start_beat() + note.start_beat();
-        let note_off = routed.placement_start_beat() + note.end_beat();
+        let placement_start = routed.placement_start_beat();
         let placement_end = routed.placement_end_beat();
+
+        let note_on = routed.placement_start_beat() + note.start_beat();
+        let natural_note_off = routed.placement_start_beat() + note.end_beat();
+        let note_off = natural_note_off.min(placement_end);
         let occurrence_key = NoteOccurrenceKey::new(*note.id(), routed.placement_id(), 0);
 
-        if note_on >= window_start
-            && note_on < window_end
-            && note_on >= routed.placement_start_beat()
-            && note_on < placement_end
+        if Self::note_on_is_in_range(note_on, window_start, window_end)
+            && Self::note_on_is_in_range(note_on, placement_start, placement_end)
         {
             events.push(ScheduledEvent::new(
                 note,
@@ -136,10 +178,8 @@ impl Scheduler {
             ));
         }
 
-        if note_off >= window_start
-            && note_off < window_end
-            && note_off >= routed.placement_start_beat()
-            && note_off < placement_end
+        if Self::note_off_is_in_range(note_off, window_start, window_end)
+            && Self::note_off_is_in_range(note_off, placement_start, placement_end)
         {
             events.push(ScheduledEvent::new(
                 note,
@@ -164,23 +204,41 @@ impl Scheduler {
         }
 
         let note = routed.note();
+        // Simple loop model: only notes that start within the loop section repeat.
+        if note.start_beat() < loop_start_beat || note.start_beat() >= loop_end_beat {
+            return;
+        }
+
         let local_on = note.start_beat() - loop_start_beat;
         let local_off = note.end_beat() - loop_start_beat;
         let placement_start = routed.placement_start_beat();
         let placement_end = routed.placement_end_beat();
 
-        let max_iterations = (routed.placement_length() / loop_length).ceil() as u64 + 1;
-        for iteration in 0..max_iterations {
+        let max_iterations = (routed.placement_length() / loop_length).ceil() as u64;
+        let Some((first_iteration, last_iteration_exclusive)) = Self::loop_iteration_bounds(
+            window_start,
+            window_end,
+            placement_start,
+            loop_length,
+            max_iterations,
+        ) else {
+            return;
+        };
+
+        for iteration in first_iteration..last_iteration_exclusive {
             let loop_offset = iteration as f64 * loop_length;
-            let note_on = placement_start + loop_offset + local_on;
-            let note_off = placement_start + loop_offset + local_off;
+            let iteration_start = placement_start + loop_offset;
+            let iteration_end = iteration_start + loop_length;
+
+            let note_on = iteration_start + local_on;
+            let natural_note_off = iteration_start + local_off;
+            let note_off = natural_note_off.min(iteration_end).min(placement_end);
+
             let occurrence_key =
                 NoteOccurrenceKey::new(*note.id(), routed.placement_id(), iteration);
 
-            if note_on >= window_start
-                && note_on < window_end
-                && note_on >= placement_start
-                && note_on < placement_end
+            if Self::note_on_is_in_range(note_on, window_start, window_end)
+                && Self::note_on_is_in_range(note_on, placement_start, placement_end)
             {
                 events.push(ScheduledEvent::new(
                     note,
@@ -190,10 +248,8 @@ impl Scheduler {
                 ));
             }
 
-            if note_off >= window_start
-                && note_off < window_end
-                && note_off >= placement_start
-                && note_off < placement_end
+            if Self::note_off_is_in_range(note_off, window_start, window_end)
+                && Self::note_off_is_in_range(note_off, placement_start, placement_end)
             {
                 events.push(ScheduledEvent::new(
                     note,
@@ -378,5 +434,296 @@ mod tests {
         assert_eq!(on_events[0].occurrence_key().loop_iteration(), 0);
         assert_eq!(on_events[1].occurrence_key().loop_iteration(), 1);
         assert_eq!(on_events[2].occurrence_key().loop_iteration(), 2);
+    }
+
+    #[test]
+    fn note_off_exactly_at_one_shot_placement_end_is_emitted() {
+        let note = ScheduledNote::new(3.5, 60, 0.5).unwrap();
+
+        let mut clips = Clips::new();
+        let clip = Clip::new(4.0, ClipPlaybackMode::OneShot).unwrap();
+        let clip_id = clips.add(clip);
+
+        let mut placements = ClipPlacements::new();
+        let placement_id = placements.add(ClipPlacement::new(clip_id, 16.0, 4.0).unwrap());
+
+        let mut router = ClipRouter::new();
+        router.route_note_to_clip(*note.id(), clip_id);
+        router.add_placement_to_clip(clip_id, placement_id);
+
+        let notes = vec![note];
+        let arrangement = ArrangementView::new(&notes, &clips, &placements, &router);
+        let routed_notes = arrangement.routed_notes();
+
+        let mut scheduler = Scheduler::new();
+        scheduler.set_lookahead(8.0).unwrap();
+
+        let mut transport = Transport::new();
+        let tempo = Tempo::new(120.0, 44_100, (4, 4));
+        transport.play();
+        transport.set_sample_position(tempo.beats_to_samples(16.0));
+
+        let events = scheduler
+            .advance_window(routed_notes, &transport, &tempo)
+            .unwrap();
+
+        assert!(events
+            .iter()
+            .any(|e| e.state() == NoteState::On && e.beat() == 19.5));
+        assert!(events
+            .iter()
+            .any(|e| e.state() == NoteState::Off && e.beat() == 20.0));
+    }
+
+    #[test]
+    fn one_shot_tail_crossing_placement_end_is_clamped() {
+        let note = ScheduledNote::new(3.5, 60, 1.0).unwrap();
+
+        let mut clips = Clips::new();
+        let clip = Clip::new(8.0, ClipPlaybackMode::OneShot).unwrap();
+        let clip_id = clips.add(clip);
+
+        let mut placements = ClipPlacements::new();
+        let placement_id = placements.add(ClipPlacement::new(clip_id, 16.0, 4.0).unwrap());
+
+        let mut router = ClipRouter::new();
+        router.route_note_to_clip(*note.id(), clip_id);
+        router.add_placement_to_clip(clip_id, placement_id);
+
+        let notes = vec![note];
+        let arrangement = ArrangementView::new(&notes, &clips, &placements, &router);
+        let routed_notes = arrangement.routed_notes();
+
+        let mut scheduler = Scheduler::new();
+        scheduler.set_lookahead(8.0).unwrap();
+
+        let mut transport = Transport::new();
+        let tempo = Tempo::new(120.0, 44_100, (4, 4));
+        transport.play();
+        transport.set_sample_position(tempo.beats_to_samples(16.0));
+
+        let events = scheduler
+            .advance_window(routed_notes, &transport, &tempo)
+            .unwrap();
+
+        assert!(events
+            .iter()
+            .any(|e| e.state() == NoteState::On && e.beat() == 19.5));
+        assert!(events
+            .iter()
+            .any(|e| e.state() == NoteState::Off && e.beat() == 20.0));
+        assert!(!events
+            .iter()
+            .any(|e| e.state() == NoteState::Off && e.beat() > 20.0));
+    }
+
+    #[test]
+    fn note_crossing_loop_end_is_clamped_before_next_iteration() {
+        let note = ScheduledNote::new(3.75, 60, 0.5).unwrap();
+
+        let mut clips = Clips::new();
+        let clip = Clip::new(
+            4.0,
+            ClipPlaybackMode::Loop {
+                start_beat: 0.0,
+                end_beat: 4.0,
+            },
+        )
+        .unwrap();
+        let clip_id = clips.add(clip);
+
+        let mut placements = ClipPlacements::new();
+        let placement_id = placements.add(ClipPlacement::new(clip_id, 16.0, 8.0).unwrap());
+
+        let mut router = ClipRouter::new();
+        router.route_note_to_clip(*note.id(), clip_id);
+        router.add_placement_to_clip(clip_id, placement_id);
+
+        let notes = vec![note];
+        let arrangement = ArrangementView::new(&notes, &clips, &placements, &router);
+        let routed_notes = arrangement.routed_notes();
+
+        let mut scheduler = Scheduler::new();
+        scheduler.set_lookahead(16.0).unwrap();
+
+        let mut transport = Transport::new();
+        transport.play();
+        let tempo = Tempo::new(120.0, 44_100, (4, 4));
+        transport.set_sample_position(tempo.beats_to_samples(16.0));
+
+        let events = scheduler
+            .advance_window(routed_notes, &transport, &tempo)
+            .unwrap();
+
+        assert!(events
+            .iter()
+            .any(|e| e.state() == NoteState::On && e.beat() == 19.75));
+        assert!(events
+            .iter()
+            .any(|e| e.state() == NoteState::Off && e.beat() == 20.0));
+        assert!(events
+            .iter()
+            .any(|e| e.state() == NoteState::On && e.beat() == 23.75));
+        assert!(events
+            .iter()
+            .any(|e| e.state() == NoteState::Off && e.beat() == 24.0));
+        assert!(!events
+            .iter()
+            .any(|e| e.state() == NoteState::Off && e.beat() == 20.25));
+    }
+
+    #[test]
+    fn note_before_non_zero_loop_start_does_not_repeat() {
+        let note = ScheduledNote::new(1.0, 60, 0.25).unwrap();
+
+        let mut clips = Clips::new();
+        let clip = Clip::new(
+            8.0,
+            ClipPlaybackMode::Loop {
+                start_beat: 2.0,
+                end_beat: 6.0,
+            },
+        )
+        .unwrap();
+        let clip_id = clips.add(clip);
+
+        let mut placements = ClipPlacements::new();
+        let placement_id = placements.add(ClipPlacement::new(clip_id, 16.0, 12.0).unwrap());
+
+        let mut router = ClipRouter::new();
+        router.route_note_to_clip(*note.id(), clip_id);
+        router.add_placement_to_clip(clip_id, placement_id);
+
+        let notes = vec![note];
+        let arrangement = ArrangementView::new(&notes, &clips, &placements, &router);
+        let routed_notes = arrangement.routed_notes();
+
+        let mut scheduler = Scheduler::new();
+        scheduler.set_lookahead(32.0).unwrap();
+
+        let mut transport = Transport::new();
+        transport.play();
+        let tempo = Tempo::new(120.0, 44_100, (4, 4));
+
+        let events = scheduler
+            .advance_window(routed_notes, &transport, &tempo)
+            .unwrap();
+
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn same_clip_two_placements_produce_distinct_occurrence_keys() {
+        let note = ScheduledNote::new(0.5, 60, 0.5).unwrap();
+
+        let mut clips = Clips::new();
+        let clip = Clip::new(4.0, ClipPlaybackMode::OneShot).unwrap();
+        let clip_id = clips.add(clip);
+
+        let mut placements = ClipPlacements::new();
+        let placement_a = placements.add(ClipPlacement::new(clip_id, 0.0, 4.0).unwrap());
+        let placement_b = placements.add(ClipPlacement::new(clip_id, 16.0, 4.0).unwrap());
+
+        let mut router = ClipRouter::new();
+        router.route_note_to_clip(*note.id(), clip_id);
+        router.add_placement_to_clip(clip_id, placement_a);
+        router.add_placement_to_clip(clip_id, placement_b);
+
+        let notes = vec![note];
+        let arrangement = ArrangementView::new(&notes, &clips, &placements, &router);
+        let routed_notes = arrangement.routed_notes();
+
+        let mut scheduler = Scheduler::new();
+        scheduler.set_lookahead(32.0).unwrap();
+
+        let mut transport = Transport::new();
+        transport.play();
+        let tempo = Tempo::new(120.0, 44_100, (4, 4));
+
+        let events = scheduler
+            .advance_window(routed_notes, &transport, &tempo)
+            .unwrap();
+
+        let on_keys: Vec<_> = events
+            .iter()
+            .filter(|e| e.state() == NoteState::On)
+            .map(|e| e.occurrence_key())
+            .collect();
+
+        assert_eq!(on_keys.len(), 2);
+        assert_ne!(on_keys[0].placement_id(), on_keys[1].placement_id());
+    }
+
+    #[test]
+    fn late_window_uses_correct_loop_iteration_indices() {
+        let note = ScheduledNote::new(1.0, 60, 0.5).unwrap();
+
+        let mut clips = Clips::new();
+        let clip = Clip::new(
+            4.0,
+            ClipPlaybackMode::Loop {
+                start_beat: 0.0,
+                end_beat: 4.0,
+            },
+        )
+        .unwrap();
+        let clip_id = clips.add(clip);
+
+        let mut placements = ClipPlacements::new();
+        let placement_id = placements.add(ClipPlacement::new(clip_id, 0.0, 120.0).unwrap());
+
+        let mut router = ClipRouter::new();
+        router.route_note_to_clip(*note.id(), clip_id);
+        router.add_placement_to_clip(clip_id, placement_id);
+
+        let notes = vec![note];
+        let arrangement = ArrangementView::new(&notes, &clips, &placements, &router);
+        let routed_notes = arrangement.routed_notes();
+
+        let mut scheduler = Scheduler::new();
+        scheduler.set_lookahead(4.0).unwrap();
+
+        let mut transport = Transport::new();
+        transport.play();
+        let tempo = Tempo::new(120.0, 44_100, (4, 4));
+        transport.set_sample_position(tempo.beats_to_samples(100.0));
+
+        let events = scheduler
+            .advance_window(routed_notes, &transport, &tempo)
+            .unwrap();
+
+        let on_event = events
+            .iter()
+            .find(|e| e.state() == NoteState::On)
+            .expect("expected NoteOn in late scheduling window");
+
+        assert_eq!(on_event.beat(), 101.0);
+        assert_eq!(on_event.occurrence_key().loop_iteration(), 25);
+    }
+
+    #[test]
+    fn loop_iteration_bounds_focus_on_window_slice_for_long_placements() {
+        let loop_length = 4.0;
+        let placement_start = 0.0;
+        let max_iterations = (10_000_000.0_f64 / loop_length).ceil() as u64;
+
+        let (first, last_exclusive) = Scheduler::loop_iteration_bounds(
+            9_999_992.0,
+            9_999_996.0,
+            placement_start,
+            loop_length,
+            max_iterations,
+        )
+        .expect("expected non-empty iteration bounds");
+
+        assert_eq!(first, 2_499_998);
+        assert_eq!(last_exclusive, 2_499_999);
+        assert_eq!(last_exclusive - first, 1);
+    }
+
+    #[test]
+    fn loop_iteration_bounds_are_none_when_window_is_before_placement() {
+        let bounds = Scheduler::loop_iteration_bounds(0.0, 4.0, 16.0, 4.0, 10);
+        assert!(bounds.is_none());
     }
 }
