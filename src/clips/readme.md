@@ -1,42 +1,41 @@
-// A clip should not replace the global transport loop.
+# Clips Crate
 
-// They represent different things:
+The clips crate models reusable musical content and where that content appears on the global arrangement timeline.
 
-// Transport loop
-//     global playback range
-//     e.g. arrangement beats 16–32
+## Responsibilities
 
-// Clip
-//     finite musical content
-//     e.g. a four-beat MIDI pattern
+- Represent clip-local musical content metadata.
+- Represent clip placements in global arrangement beat space.
+- Own relationship routing between notes, clips, and placements.
+- Provide an arrangement view that resolves scheduler-ready routed notes.
 
-// A clip can loop while the transport continues forward:
+## Main Types
 
-// Transport:  0 ─────────────────────────────── 16
+- Clip: clip-local content metadata with length and playback mode.
+- Clips: clip registry keyed by UUID.
+- ClipPlacement: one global placement for a clip.
+- ClipPlacements: placement registry keyed by UUID.
+- ClipRouter: note-to-clip and clip-to-placement routing.
+- ResolvedClipNote: borrowed resolved view (note + clip + placement).
+- RoutedNote: lightweight scheduling input with placement context.
+- ArrangementView: orchestration helper that resolves all routed notes.
 
-// Clip:       [0 1 2 3][0 1 2 3][0 1 2 3]...
+## Key Functions
 
-// Or it can play once:
+- Clip::new(length, playback_mode)
+- Clips::new(), Clips::add(clip), Clips::get(id), Clips::iter()
+- ClipPlacement::new(clip_id, start_beat, length)
+- ClipPlacements::new(), ClipPlacements::add(placement), ClipPlacements::get(id), ClipPlacements::iter()
+- ClipRouter::new()
+- ClipRouter::route_note_to_clip(note_id, clip_id)
+- ClipRouter::add_placement_to_clip(clip_id, placement_id)
+- ClipRouter::resolve_note(note, clips, placements)
+- ClipRouter::resolve_routed_note(note, clips, placements)
+- ArrangementView::new(notes, clips, placements, router)
+- ArrangementView::routed_notes()
 
-// Transport:  0 ─────────────────────────────── 16
+## Boundary Notes
 
-// Clip:       [0 1 2 3] stop
-
-// So I would avoid putting clip bounds directly into Transport.
-
-// Suggested ownership
-// Transport
-//     owns global position and playing state
-
-// Clip
-//     owns local bounds and playback mode
-
-// Scheduler
-//     maps transport time into clip-local time
-//     materialises note occurrences
-
-// ProbabilityGate
-//     evaluates the resulting occurrences
-
-// Playback
-//     executes definitive events
+- This crate resolves relationships and context.
+- It does not schedule windows or materialize final playback events.
+- The scheduler should consume RoutedNote inputs instead of traversing clip registries directly.

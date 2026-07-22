@@ -91,3 +91,26 @@ src/
 ```
 
 The public module exports are collected in `src/lib.rs`, and each domain folder exposes its main types through its own `mod.rs`.
+
+## Crate Docs
+
+- [clips crate docs](src/clips/README.md)
+- [playback crate docs](src/playback/README.md)
+- [scheduler crate docs](src/scheduler/README.md)
+- [tempo crate docs](src/tempo/README.md)
+- [transport crate docs](src/transport/README.md)
+
+## Architecture Map
+
+Execution-oriented flow:
+
+1. Timing source: [tempo crate docs](src/tempo/README.md) + [transport crate docs](src/transport/README.md)
+2. Arrangement resolution: [clips crate docs](src/clips/README.md)
+3. Event materialization window: [scheduler crate docs](src/scheduler/README.md)
+4. Playback mapping and gating: [playback crate docs](src/playback/README.md)
+
+Pipeline summary:
+
+```text
+Tempo + Transport -> Clips (ArrangementView/ClipRouter) -> Scheduler -> Playback (ProbabilityGate + PlaybackEvent)
+```
